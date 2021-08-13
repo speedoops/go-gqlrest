@@ -1,0 +1,72 @@
+{{ reserveImport "context"  }}
+{{ reserveImport "fmt"  }}
+{{ reserveImport "io"  }}
+{{ reserveImport "strconv"  }}
+{{ reserveImport "time"  }}
+{{ reserveImport "sync"  }}
+{{ reserveImport "errors"  }}
+{{ reserveImport "bytes"  }}
+{{ reserveImport "strings"  }}
+
+{{ reserveImport "github.com/vektah/gqlparser/v2" }}
+{{ reserveImport "github.com/vektah/gqlparser/v2/ast" }}
+{{ reserveImport "github.com/99designs/gqlgen/graphql" }}
+{{ reserveImport "github.com/99designs/gqlgen/graphql/introspection" }}
+
+var rest2gql map[string]string
+
+func init() {
+	rest2gql := make(map[string]string)
+
+{{ $root := . }}
+
+// Query
+{{ $object := .QueryRoot -}}
+{{ range $field := $object.Fields -}}
+	{{- $prefix := slice $field.Name 0 2 -}}
+	{{- $internal := eq $prefix "__" -}}
+    {{- if not $internal -}}
+		{{ $url := getURL $field }}
+		{{- if $url }}
+			// {{ $url }}
+		{{ end -}}
+		{{- $selection := getSelection $root.Objects $field false -}}
+		rest2gql["query_{{ $field.Name }}"] = "{{ $selection }}"		
+		{{ range $arg := $field.Arguments -}}
+			// arg[{{ $arg.Name }}] = "{{ $arg.Type}}"
+		{{ end -}}
+	{{ end -}}
+{{ end }}
+
+// field.Arguments
+{{ range $field := $object.Fields -}}
+	{{- $prefix := slice $field.Name 0 2 -}}
+	{{- $internal := eq $prefix "__" -}}
+    {{- if not $internal -}}
+		{{ $url := getURL $field }}
+		{{- if $url }}
+			// {{ $url }}
+		{{ end -}}
+		{{- $selection := getSelection $root.Objects $field false -}}
+		rest2gql["query_{{ $field.Name }}"] = "{{ $selection }}"
+	{{ end -}}
+{{ end }}
+
+// Mutation
+{{ $object := .MutationRoot -}}
+{{ range $field := $object.Fields -}}
+	{{- $prefix := slice $field.Name 0 2 -}}
+	{{- $internal := eq $prefix "__" -}}
+    {{- if not $internal -}}
+		{{- $selection := getSelection $root.Objects $field false -}}
+		rest2gql["mutation_{{ $field.Name }}"] = "{{ $selection }}"
+	{{ end -}}
+{{ end }}
+}
+
+func get(key string) (string, bool) {
+	if gql, ok := rest2gql[key]; ok {
+		return gql, true
+	}
+	return "", false
+}
