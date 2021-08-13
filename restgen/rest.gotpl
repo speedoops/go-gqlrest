@@ -13,6 +13,7 @@
 {{ reserveImport "github.com/99designs/gqlgen/graphql" }}
 {{ reserveImport "github.com/99designs/gqlgen/graphql/introspection" }}
 
+// v2021-08-14
 var rest2gql map[string]string
 
 func init() {
