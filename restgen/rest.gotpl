@@ -14,59 +14,72 @@
 {{ reserveImport "github.com/99designs/gqlgen/graphql/introspection" }}
 
 // v2021-08-14
-var rest2gql map[string]string
+// REST URL => GraphQL Operation
+var restOperation map[string]string
+// GraphQL Operation => Fields Selection
+var restSelection map[string]string
+// GraphQL Operation => Arguments <Name,Type>
+var restArguments map[string]map[string]string
 
 func init() {
-	rest2gql := make(map[string]string)
+	restOperation := make(map[string]string)
+	restSelection := make(map[string]string)
+	restArguments := make(map[string]map[string]string)
 
-{{ $root := . }}
+	var methodArguments map[string]string
+	{{ $root := . }}
 
-// Query
-{{ $object := .QueryRoot -}}
-{{ range $field := $object.Fields -}}
-	{{- $prefix := slice $field.Name 0 2 -}}
-	{{- $internal := eq $prefix "__" -}}
-    {{- if not $internal -}}
-		{{ $url := getURL $field }}
-		{{- if $url }}
-			// {{ $url }}
+	// Query
+	{{ $object := .QueryRoot -}}
+	{{ range $field := $object.Fields -}}
+		{{- $prefix := slice $field.Name 0 2 -}}
+		{{- $internal := eq $prefix "__" -}}
+		{{- if not $internal -}}
+		{ // {{ $field.Name }}
+			{{ $url := getURL $field -}}
+			{{ if $url -}}
+				restOperation[{{ $url }}] = "{{ $field.Name }}"
+			{{ end -}}
+			{{- $selection := getSelection $root.Objects $field false -}}
+			restSelection["{{ $field.Name }}"] = "{{ $selection }}"
+
+			methodArguments = make(map[string]string)	
+			{{ range $arg := $field.Arguments -}}
+				methodArguments["{{ $arg.Name }}"] = "{{ $arg.Type}}"
+			{{ end -}}
+			restArguments["{{ $field.Name }}"] = methodArguments
+		}
 		{{ end -}}
-		{{- $selection := getSelection $root.Objects $field false -}}
-		rest2gql["query_{{ $field.Name }}"] = "{{ $selection }}"		
-		{{ range $arg := $field.Arguments -}}
-			// arg[{{ $arg.Name }}] = "{{ $arg.Type}}"
+	{{ end }}
+
+	// field.Arguments
+	{{ range $field := $object.Fields -}}
+		{{- $prefix := slice $field.Name 0 2 -}}
+		{{- $internal := eq $prefix "__" -}}
+		{{- if not $internal -}}
+			{{ $url := getURL $field }}
+			{{- if $url }}
+				// {{ $url }}
+			{{ end -}}
+			{{- $selection := getSelection $root.Objects $field false -}}
+			restSelection["query_{{ $field.Name }}"] = "{{ $selection }}"
+		{{ end -}}
+	{{ end }}
+
+	// Mutation
+	{{ $object := .MutationRoot -}}
+	{{ range $field := $object.Fields -}}
+		{{- $prefix := slice $field.Name 0 2 -}}
+		{{- $internal := eq $prefix "__" -}}
+		{{- if not $internal -}}
+			{{- $selection := getSelection $root.Objects $field false -}}
+			restSelection["mutation_{{ $field.Name }}"] = "{{ $selection }}"
 		{{ end -}}
 	{{ end -}}
-{{ end }}
-
-// field.Arguments
-{{ range $field := $object.Fields -}}
-	{{- $prefix := slice $field.Name 0 2 -}}
-	{{- $internal := eq $prefix "__" -}}
-    {{- if not $internal -}}
-		{{ $url := getURL $field }}
-		{{- if $url }}
-			// {{ $url }}
-		{{ end -}}
-		{{- $selection := getSelection $root.Objects $field false -}}
-		rest2gql["query_{{ $field.Name }}"] = "{{ $selection }}"
-	{{ end -}}
-{{ end }}
-
-// Mutation
-{{ $object := .MutationRoot -}}
-{{ range $field := $object.Fields -}}
-	{{- $prefix := slice $field.Name 0 2 -}}
-	{{- $internal := eq $prefix "__" -}}
-    {{- if not $internal -}}
-		{{- $selection := getSelection $root.Objects $field false -}}
-		rest2gql["mutation_{{ $field.Name }}"] = "{{ $selection }}"
-	{{ end -}}
-{{ end }}
 }
 
 func get(key string) (string, bool) {
-	if gql, ok := rest2gql[key]; ok {
+	if gql, ok := restSelection[key]; ok {
 		return gql, true
 	}
 	return "", false
