@@ -118,5 +118,5 @@ func DbgPrint(r *http.Request, format string, v ...interface{}) {
 	//if config.GraphQL.Debug.EnableVerbose && len(r.URL.Query()) > 0 {
 	//logx.Infof(format, v...)
 	//}
-	fmt.Printf(format+"\n", v...)
+	//fmt.Printf(format+"\n", v...)
 }
