@@ -14,20 +14,17 @@
 {{ reserveImport "github.com/99designs/gqlgen/graphql" }}
 {{ reserveImport "github.com/99designs/gqlgen/graphql/introspection" }}
 {{ reserveImport "github.com/go-chi/chi/v5" }}
-
-// REST URL => GraphQL Operation
-var restOperation map[string]string
-// GraphQL Operation => Fields Selection
-var restSelection map[string]string
-// GraphQL Operation => Arguments <Name,Type>
-var restArguments map[string]map[string]string
+{{ reserveImport "github.com/speedoops/gqlgen2rest/handlerx" }}
 
 func RegisterHandlers(prefix string, r *chi.Mux, srv http.Handler) {
-	restOperation = make(map[string]string)
-	restSelection = make(map[string]string)
-	restArguments = make(map[string]map[string]string)
+	// REST URL => GraphQL Operation
+	restOperation := make(handlerx.RESTOperationType)
+	// GraphQL Operation => Fields Selection
+	restSelection := make(handlerx.RESTSelectionType)
+	// GraphQL Operation => Arguments <Name,Type>
+	restArguments := make(handlerx.RESTArgumentsType)
 
-	var methodArguments map[string]string
+	var methodArguments handlerx.ArgumentsType
 	{{ $root := . }}
 
 	// Query
@@ -47,7 +44,7 @@ func RegisterHandlers(prefix string, r *chi.Mux, srv http.Handler) {
 			{{- $selection := getSelection $root.Objects $field false -}}
 			restSelection["{{ $field.Name }}"] = "{{ $selection }}"
 
-			methodArguments = make(map[string]string)	
+			methodArguments = make(handlerx.ArgumentsType)	
 			{{ range $arg := $field.Arguments -}}
 				methodArguments["{{ $arg.Name }}"] = "{{ $arg.Type}}"
 			{{ end -}}
@@ -81,11 +78,7 @@ func RegisterHandlers(prefix string, r *chi.Mux, srv http.Handler) {
 		}
 		{{ end -}}
 	{{ end }}
+
+	handlerx.SetupHTTP2GraphQLMapping(restOperation, restSelection, restArguments)
 }
 
-func get(key string) (string, bool) {
-	if gql, ok := restSelection[key]; ok {
-		return gql, true
-	}
-	return "", false
-}
