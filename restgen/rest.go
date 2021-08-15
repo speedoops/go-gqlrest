@@ -11,7 +11,7 @@ import (
 	"github.com/99designs/gqlgen/codegen/config"
 	"github.com/99designs/gqlgen/codegen/templates"
 	"github.com/99designs/gqlgen/plugin"
-	"github.com/speedoops/gqlgen2rest/utils"
+	"github.com/speedoops/gqlgen2rest/restgen/utils"
 	"github.com/vektah/gqlparser/v2/ast"
 )
 
