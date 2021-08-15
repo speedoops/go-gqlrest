@@ -1,4 +1,4 @@
-module github.com/speedoops/gqlgen2rest
+module github.com/speedoops/gql2rest
 
 go 1.16
 

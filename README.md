@@ -1,2 +1,2 @@
-# gqlgen2rest
+# gql2rest
 A gqlgen plugin and library, generates RESTful HTTP Server via GraphQL Schema
