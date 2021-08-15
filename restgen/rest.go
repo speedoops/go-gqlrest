@@ -37,7 +37,11 @@ func (m *Plugin) MutateConfig(cfg *config.Config) error {
 }
 
 // ADE:
-func DbgPrint(objects *codegen.Objects, object *codegen.Object) {
+func DbgPrintln(a ...interface{}) {
+	fmt.Println(a...)
+}
+
+func DumpObject(objects *codegen.Objects, object *codegen.Object) {
 	// data.Objects
 	// data.QueryRoot.Fields
 	// _ = data.Objects[0].Fields[0].ShortResolverDeclaration()
@@ -83,7 +87,10 @@ func GetArguments(objects *codegen.Objects, field *codegen.Field) string {
 }
 
 func GetSelection(objects *codegen.Objects, field *codegen.Field, refer bool) string {
-	//fmt.Println("=> field:", field.Object.Name, field.Name, field.FieldDefinition.Directives)
+	if !refer {
+		DbgPrintln("\n+++++++++++++++++++++++++++++++++++++++++")
+	}
+	DbgPrintln("=> field:", field.Object.Name, field.Name, field.FieldDefinition.Directives)
 
 	// 忽略内置字段
 	if strings.HasPrefix(field.Name, "__") {
@@ -91,53 +98,55 @@ func GetSelection(objects *codegen.Objects, field *codegen.Field, refer bool) st
 	}
 
 	// 忽略未选字段
-	directive := field.FieldDefinition.Directives.ForName("select")
-	if directive == nil || !ShouldSelect(directive) {
+	directive := field.FieldDefinition.Directives.ForName("hide")
+	if directive != nil {
+		DbgPrintln("field.directive:", directive.Name, ShouldHide(directive))
+	}
+	if ShouldHide(directive) {
 		return ""
 	}
-	//fmt.Println("field.directive:", directive.Name, ShouldSelect(directive))
 
 	selection := ""
 	if refer {
 		selection = field.Name
 	}
-	if len(field.TypeReference.Definition.Fields) == 0 {
-		return selection
-	}
 
-	innerSelection := "{"
+	innerSelections := make([]string, 0)
 	for _, innerField := range field.TypeReference.Definition.Fields {
-		//fmt.Println("..innerField:", innerField.Name, innerField.Type)
-		innerDirective := innerField.Directives.ForName("select")
-		if innerDirective == nil {
-			continue
+		fmt.Println("..innerField:", innerField.Name, innerField.Type)
+		innerDirective := innerField.Directives.ForName("hide")
+		if innerDirective != nil {
+			DbgPrintln("..innerField.directive:", innerDirective.Name, ShouldHide(innerDirective))
 		}
-
-		//fmt.Println("..innerField.directive:", directive.Name, ShouldSelect(innerDirective))
-		if !ShouldSelect(innerDirective) {
+		if ShouldHide(innerDirective) {
 			continue
 		}
 
 		referObject := objects.ByName(innerField.Name)
 		if referObject == nil {
-			innerSelection += innerField.Name + ","
+			innerSelections = append(innerSelections, innerField.Name)
 			continue
 		}
 
-		referSelection := make([]string, 0)
+		referSelections := make([]string, 0)
 		for _, referField := range referObject.Fields {
-			referSelection = append(referSelection, GetSelection(objects, referField, true))
+			xxx := GetSelection(objects, referField, true)
+			if xxx != "" {
+				referSelections = append(referSelections, xxx)
+			}
 		}
-		if len(referSelection) > 0 {
-			innerSelection += innerField.Name + "{" + strings.Join(referSelection, ",") + "},"
+		if len(referSelections) > 0 {
+			innerSelections = append(innerSelections, innerField.Name+"{"+strings.Join(referSelections, ",")+"}")
 		}
 	}
-	innerSelection += "}"
-	return selection + innerSelection
+	if len(innerSelections) > 0 {
+		selection += "{" + strings.Join(innerSelections, ",") + "}"
+	}
+	return selection
 }
 
 // _$_ [Using Functions Inside Go Templates - Calhoun.io](https://www.calhoun.io/intro-to-templates-p3-functions/# ) | ClippedOn=2021-08-10T09:45:06.709Z
-func ShouldSelect(directive *ast.Directive) bool {
+func ShouldHide(directive *ast.Directive) bool {
 	if directive == nil {
 		return false
 	}
@@ -151,7 +160,7 @@ func ShouldSelect(directive *ast.Directive) bool {
 	var l []*ast.ChildValue
 	l = forName.Value.Children
 	for _, v := range l {
-		//fmt.Println("~tags:", v.Name, v.Value)
+		DbgPrintln("~tags:", v.Name, v.Value)
 		if v.Value.Raw == "rest" {
 			return true
 		}
@@ -166,14 +175,29 @@ func GetURL(field *codegen.Field) string {
 		return ""
 	}
 
-	forName := directive.Arguments.ForName("url")
-	forValue := forName.Value.String()
+	urlName := directive.Arguments.ForName("url")
+	urlValue := urlName.Value.String()
 
-	return forValue
+	return urlValue
+}
+
+func GetMethod(field *codegen.Field) string {
+	directive := field.FieldDefinition.Directives.ForName("http")
+	if directive == nil {
+		return ""
+	}
+
+	methodName := directive.Arguments.ForName("method")
+	methodValue := `"GET"`
+	if methodName != nil {
+		methodValue = methodName.Value.String()
+	}
+
+	return methodValue
 }
 
 func (m *Plugin) GenerateCode(data *codegen.Data) error {
-	DbgPrint(&data.Objects, data.Objects.ByName("query"))
+	DumpObject(&data.Objects, data.Objects.ByName("query"))
 
 	abs, err := filepath.Abs(m.filename)
 	if err != nil {
@@ -189,9 +213,9 @@ func (m *Plugin) GenerateCode(data *codegen.Data) error {
 			TypeName: m.typeName,
 		},
 		Funcs: template.FuncMap{
-			"shouldSelect": func(directive *ast.Directive) bool {
-				return ShouldSelect(directive)
-			},
+			// "shouldHide": func(directive *ast.Directive) bool {
+			// 	return ShouldHide(directive)
+			// },
 			"getSelection": func(objects *codegen.Objects, field *codegen.Field, refer bool) string {
 				return GetSelection(objects, field, refer)
 			},
@@ -200,6 +224,9 @@ func (m *Plugin) GenerateCode(data *codegen.Data) error {
 			},
 			"getURL": func(field *codegen.Field) string {
 				return GetURL(field)
+			},
+			"getMethod": func(field *codegen.Field) string {
+				return GetMethod(field)
 			},
 		},
 		GeneratedHeader: true,

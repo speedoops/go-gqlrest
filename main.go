@@ -1,4 +1,3 @@
-// +build ignore
 package main
 
 import (
@@ -18,7 +17,7 @@ func main() {
 	}
 
 	err = api.Generate(cfg,
-		api.AddPlugin(restgen.New("plugin-rest.go", "Query")), // This is the magic line
+		api.AddPlugin(restgen.New("graph/handlerx/rest.go", "Query")), // This is the magic line
 		//api.AddPlugin(stubgen.New("plugin-stub.go", "Query")), // This is the magic line
 	)
 	if err != nil {

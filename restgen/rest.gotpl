@@ -7,13 +7,14 @@
 {{ reserveImport "errors"  }}
 {{ reserveImport "bytes"  }}
 {{ reserveImport "strings"  }}
+{{ reserveImport "net/http"  }}
 
 {{ reserveImport "github.com/vektah/gqlparser/v2" }}
 {{ reserveImport "github.com/vektah/gqlparser/v2/ast" }}
 {{ reserveImport "github.com/99designs/gqlgen/graphql" }}
 {{ reserveImport "github.com/99designs/gqlgen/graphql/introspection" }}
+{{ reserveImport "github.com/go-chi/chi/v5" }}
 
-// v2021-08-14
 // REST URL => GraphQL Operation
 var restOperation map[string]string
 // GraphQL Operation => Fields Selection
@@ -21,10 +22,10 @@ var restSelection map[string]string
 // GraphQL Operation => Arguments <Name,Type>
 var restArguments map[string]map[string]string
 
-func init() {
-	restOperation := make(map[string]string)
-	restSelection := make(map[string]string)
-	restArguments := make(map[string]map[string]string)
+func RegisterHandlers(prefix string, r *chi.Mux, srv http.Handler) {
+	restOperation = make(map[string]string)
+	restSelection = make(map[string]string)
+	restArguments = make(map[string]map[string]string)
 
 	var methodArguments map[string]string
 	{{ $root := . }}
@@ -37,8 +38,11 @@ func init() {
 		{{- if not $internal -}}
 		{ // {{ $field.Name }}
 			{{ $url := getURL $field -}}
-			{{ if $url -}}
-				restOperation[{{ $url }}] = "{{ $field.Name }}"
+			{{ if $url -}}				
+				{{ $method := getMethod $field -}}
+				r.Method({{ $method }}, prefix + {{ $url }}, srv)
+
+				restOperation[prefix + {{ $url }}] = "{{ $field.Name }}"
 			{{ end -}}
 			{{- $selection := getSelection $root.Objects $field false -}}
 			restSelection["{{ $field.Name }}"] = "{{ $selection }}"
@@ -52,30 +56,31 @@ func init() {
 		{{ end -}}
 	{{ end }}
 
-	// field.Arguments
-	{{ range $field := $object.Fields -}}
-		{{- $prefix := slice $field.Name 0 2 -}}
-		{{- $internal := eq $prefix "__" -}}
-		{{- if not $internal -}}
-			{{ $url := getURL $field }}
-			{{- if $url }}
-				// {{ $url }}
-			{{ end -}}
-			{{- $selection := getSelection $root.Objects $field false -}}
-			restSelection["query_{{ $field.Name }}"] = "{{ $selection }}"
-		{{ end -}}
-	{{ end }}
-
 	// Mutation
 	{{ $object := .MutationRoot -}}
 	{{ range $field := $object.Fields -}}
 		{{- $prefix := slice $field.Name 0 2 -}}
 		{{- $internal := eq $prefix "__" -}}
 		{{- if not $internal -}}
+		{ // {{ $field.Name }}
+			{{ $url := getURL $field -}}
+			{{ if $url -}}				
+				{{ $method := getMethod $field -}}
+				r.Method({{ $method }}, prefix + {{ $url }}, srv)
+				
+				restOperation[prefix + {{ $url }}] = "{{ $field.Name }}"
+			{{ end -}}
 			{{- $selection := getSelection $root.Objects $field false -}}
-			restSelection["mutation_{{ $field.Name }}"] = "{{ $selection }}"
+			restSelection["{{ $field.Name }}"] = "{{ $selection }}"
+
+			methodArguments = make(map[string]string)	
+			{{ range $arg := $field.Arguments -}}
+				methodArguments["{{ $arg.Name }}"] = "{{ $arg.Type}}"
+			{{ end -}}
+			restArguments["{{ $field.Name }}"] = methodArguments
+		}
 		{{ end -}}
-	{{ end -}}
+	{{ end }}
 }
 
 func get(key string) (string, bool) {
