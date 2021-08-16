@@ -42,14 +42,15 @@ func DbgPrintln(a ...interface{}) {
 }
 
 func DumpObject(objects *codegen.Objects, object *codegen.Object) {
+	if object == nil {
+		return
+	}
+
 	// data.Objects
 	// data.QueryRoot.Fields
 	// _ = data.Objects[0].Fields[0].ShortResolverDeclaration()
 	// _ = data.Objects[0].Fields[0].Arguments[0].Name
 	fmt.Printf("\n=> objects: %#v\n", object.Type)
-	if object == nil {
-		return
-	}
 
 	for _, field := range object.Fields {
 		fmt.Println("=> field:", field.Name, GetSelection(objects, field, false))
@@ -181,14 +182,14 @@ func GetURL(field *codegen.Field) string {
 	return urlValue
 }
 
-func GetMethod(field *codegen.Field) string {
+func GetMethod(field *codegen.Field, defaultMethod string) string {
 	directive := field.FieldDefinition.Directives.ForName("http")
 	if directive == nil {
 		return ""
 	}
 
 	methodName := directive.Arguments.ForName("method")
-	methodValue := `"GET"`
+	methodValue := fmt.Sprintf(`"%s"`, defaultMethod)
 	if methodName != nil {
 		methodValue = methodName.Value.String()
 	}
@@ -225,8 +226,8 @@ func (m *Plugin) GenerateCode(data *codegen.Data) error {
 			"getURL": func(field *codegen.Field) string {
 				return GetURL(field)
 			},
-			"getMethod": func(field *codegen.Field) string {
-				return GetMethod(field)
+			"getMethod": func(field *codegen.Field, defaultMethod string) string {
+				return GetMethod(field, defaultMethod)
 			},
 		},
 		GeneratedHeader: true,
