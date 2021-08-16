@@ -158,10 +158,8 @@ func ShouldHide(directive *ast.Directive) bool {
 	// 	fmt.Println("YES")
 	// }
 
-	var l []*ast.ChildValue
-	l = forName.Value.Children
-	for _, v := range l {
-		DbgPrintln("~tags:", v.Name, v.Value)
+	for _, v := range forName.Value.Children {
+		// DbgPrintln("~tags:", v.Name, v.Value)
 		if v.Value.Raw == "rest" {
 			return true
 		}
