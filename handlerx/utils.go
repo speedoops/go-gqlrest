@@ -26,7 +26,35 @@ func statusFor(errs gqlerror.List) int {
 	}
 }
 
-func writeJSON(w io.Writer, response *graphql.Response) {
+type jsonResponse struct {
+	Code    int             `json:"code"`
+	Data    json.RawMessage `json:"data"`
+	Errors  gqlerror.List   `json:"errors"`
+	Message string          `json:"message"`
+}
+
+func writeJSON(w io.Writer, r *graphql.Response) {
+	response := &jsonResponse{
+		Code:   200,
+		Errors: r.Errors,
+		Data:   r.Data,
+	}
+
+	if len(r.Errors) > 0 {
+		var code int = 200
+		for _, e := range r.Errors {
+			if e.Extensions != nil {
+				if n, ok := e.Extensions["code"]; ok {
+					code, _ = n.(int)
+					break
+				}
+			}
+		}
+
+		response.Code = code
+		response.Message = r.Errors.Error()
+	}
+
 	b, err := json.Marshal(response)
 	if err != nil {
 		panic(err)
@@ -38,14 +66,29 @@ func writeJSON(w io.Writer, response *graphql.Response) {
 	}
 }
 
-func writeJSONError(w io.Writer, msg string) {
-	writeJSON(w, &graphql.Response{Errors: gqlerror.List{{Message: msg}}})
+func writeJSONError(w io.Writer, code ErrorCode, msg string) {
+	writeJSON(w, &graphql.Response{
+		Extensions: map[string]interface{}{
+			"code": code,
+		},
+		Errors: gqlerror.List{{Message: msg}},
+	})
 }
 
-func writeJSONErrorf(w io.Writer, format string, args ...interface{}) {
-	writeJSON(w, &graphql.Response{Errors: gqlerror.List{{Message: fmt.Sprintf(format, args...)}}})
+func writeJSONErrorf(w io.Writer, code ErrorCode, format string, args ...interface{}) {
+	writeJSON(w, &graphql.Response{
+		Extensions: map[string]interface{}{
+			"code": code,
+		},
+		Errors: gqlerror.List{{Message: fmt.Sprintf(format, args...)}},
+	})
 }
 
-func writeJSONGraphqlError(w io.Writer, err ...*gqlerror.Error) {
-	writeJSON(w, &graphql.Response{Errors: err})
+func writeJSONGraphqlError(w io.Writer, code ErrorCode, err ...*gqlerror.Error) {
+	writeJSON(w, &graphql.Response{
+		Extensions: map[string]interface{}{
+			"code": code,
+		},
+		Errors: err,
+	})
 }

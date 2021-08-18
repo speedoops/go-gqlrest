@@ -35,7 +35,7 @@ func (h DELETE) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExe
 	if variables := r.URL.Query().Get("variables"); variables != "" {
 		if err := jsonDecode(strings.NewReader(variables), &params.Variables); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			writeJSONError(w, "variables could not be decoded")
+			writeJSONError(w, ErrDecodeJson, "variables could not be decoded")
 			return
 		}
 	}
@@ -45,7 +45,7 @@ func (h DELETE) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExe
 		queryString, err := HTTPRequest2GraphQLQuery(r, params, body)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			writeJSONErrorf(w, "json body could not be decoded: "+err.Error())
+			writeJSONErrorf(w, ErrDecodeJson, "json body could not be decoded: "+err.Error())
 			return
 		}
 		params.Query = queryString
