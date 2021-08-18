@@ -27,6 +27,14 @@ var restOperation RESTOperationType
 var restSelection RESTSelectionType
 var restArguments RESTArgumentsType
 
+// 3. 全局错误码
+type ErrorCode int
+
+const (
+	ErrDecodeJson   = 500
+	ErrInvalidParam = 400
+)
+
 func SetupHTTP2GraphQLMapping(operation RESTOperationType, selection RESTSelectionType, arguments RESTArgumentsType) {
 	restOperation = operation
 	restSelection = selection

@@ -34,7 +34,7 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 	if variables := r.URL.Query().Get("variables"); variables != "" {
 		if err := jsonDecode(strings.NewReader(variables), &params.Variables); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			writeJSONError(w, "variables could not be decoded")
+			writeJSONError(w, ErrDecodeJson, "variables could not be decoded")
 			return
 		}
 	}
@@ -42,7 +42,7 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 	if extensions := r.URL.Query().Get("extensions"); extensions != "" {
 		if err := jsonDecode(strings.NewReader(extensions), &params.Extensions); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			writeJSONError(w, "extensions could not be decoded")
+			writeJSONError(w, ErrDecodeJson, "extensions could not be decoded")
 			return
 		}
 	}
@@ -52,7 +52,7 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 		queryString, err := HTTPRequest2GraphQLQuery(r, params, nil)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			writeJSONErrorf(w, "json body could not be decoded: "+err.Error())
+			writeJSONErrorf(w, ErrDecodeJson, "json body could not be decoded: "+err.Error())
 			return
 		}
 		params.Query = queryString
@@ -75,7 +75,7 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 	op := rc.Doc.Operations.ForName(rc.OperationName)
 	if op.Operation != ast.Query {
 		w.WriteHeader(http.StatusNotAcceptable)
-		writeJSONError(w, "GET requests only allow query operations")
+		writeJSONError(w, ErrInvalidParam, "GET requests only allow query operations")
 		return
 	}
 

@@ -6,4 +6,5 @@ require (
 	github.com/99designs/gqlgen v0.13.0
 	github.com/go-chi/chi/v5 v5.0.3
 	github.com/vektah/gqlparser/v2 v2.2.0
+	golang.org/x/tools v0.1.5 // indirect
 )
