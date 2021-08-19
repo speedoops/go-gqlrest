@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/errcode"
@@ -41,17 +42,23 @@ func writeJSON(w io.Writer, r *graphql.Response) {
 	}
 
 	if len(r.Errors) > 0 {
-		var code int = 200
+		var code errcode.ErrorKind = errcode.KindUser
 		for _, e := range r.Errors {
 			if e.Extensions != nil {
 				if n, ok := e.Extensions["code"]; ok {
-					code, _ = n.(int)
-					break
+					data, ok := n.(string)
+					if ok {
+						codeNum, _ := strconv.Atoi(data)
+						if codeNum > 0 {
+							code = errcode.ErrorKind(codeNum)
+							break
+						}
+					}
 				}
 			}
 		}
 
-		response.Code = code
+		response.Code = int(code)
 		response.Message = r.Errors.Error()
 	}
 
