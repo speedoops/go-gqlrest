@@ -1,10 +1,8 @@
 package client
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 
@@ -25,10 +23,9 @@ type (
 
 	// Request represents an outgoing GraphQL request
 	Request struct {
-		Method    string                 `josn:"method"`
-		Target    string                 `json:"target"`
-		Variables map[string]interface{} `json:"variables,omitempty"`
-		HTTP      *http.Request          `json:"-"`
+		Method string        `josn:"method"`
+		Target string        `json:"target"`
+		HTTP   *http.Request `json:"-"`
 	}
 
 	// Response is a GraphQL layer response from a handler.
@@ -83,8 +80,8 @@ func (p *Client) MustPost(query string, response interface{}, options ...Option)
 
 // Post sends a http POST request to the graphql endpoint with the given query then unpacks
 // the response into the given object.
-func (p *Client) Post(query string, response interface{}, options ...Option) error {
-	respDataRaw, err := p.RawRequest(http.MethodPost, query, options...)
+func (p *Client) Post(target string, response interface{}, options ...Option) error {
+	respDataRaw, err := p.RawRequest(http.MethodPost, target, options...)
 	if err != nil {
 		return err
 	}
@@ -99,16 +96,16 @@ func (p *Client) Post(query string, response interface{}, options ...Option) err
 }
 
 // MustPost is a convenience wrapper around Post that automatically panics on error
-func (p *Client) MustPut(query string, response interface{}, options ...Option) {
-	if err := p.Post(query, response, options...); err != nil {
+func (p *Client) MustPut(target string, response interface{}, options ...Option) {
+	if err := p.Post(target, response, options...); err != nil {
 		panic(err)
 	}
 }
 
 // Post sends a http POST request to the graphql endpoint with the given query then unpacks
 // the response into the given object.
-func (p *Client) Put(query string, response interface{}, options ...Option) error {
-	respDataRaw, err := p.RawRequest(http.MethodPut, query, options...)
+func (p *Client) Put(target string, response interface{}, options ...Option) error {
+	respDataRaw, err := p.RawRequest(http.MethodPut, target, options...)
 	if err != nil {
 		return err
 	}
@@ -123,16 +120,16 @@ func (p *Client) Put(query string, response interface{}, options ...Option) erro
 }
 
 // MustPost is a convenience wrapper around Post that automatically panics on error
-func (p *Client) MustDelete(query string, response interface{}, options ...Option) {
-	if err := p.Post(query, response, options...); err != nil {
+func (p *Client) MustDelete(target string, response interface{}, options ...Option) {
+	if err := p.Post(target, response, options...); err != nil {
 		panic(err)
 	}
 }
 
 // Post sends a http POST request to the graphql endpoint with the given query then unpacks
 // the response into the given object.
-func (p *Client) Delete(query string, response interface{}, options ...Option) error {
-	respDataRaw, err := p.RawRequest(http.MethodDelete, query, options...)
+func (p *Client) Delete(target string, response interface{}, options ...Option) error {
+	respDataRaw, err := p.RawRequest(http.MethodDelete, target, options...)
 	if err != nil {
 		return err
 	}
@@ -149,8 +146,8 @@ func (p *Client) Delete(query string, response interface{}, options ...Option) e
 // RawPost is similar to Post, except it skips decoding the raw json response
 // unpacked onto Response. This is used to test extension keys which are not
 // available when using Post.
-func (p *Client) RawRequest(method string, query string, options ...Option) (*Response, error) {
-	r, err := p.newRequest(method, query, options...)
+func (p *Client) RawRequest(method string, target string, options ...Option) (*Response, error) {
+	r, err := p.newRequest(method, target, options...)
 	if err != nil {
 		return nil, fmt.Errorf("build: %s", err.Error())
 	}
@@ -189,18 +186,18 @@ func (p *Client) newRequest(method string, target string, options ...Option) (*h
 		option(bd)
 	}
 
-	switch bd.HTTP.Header.Get("Content-Type") {
-	case "application/json":
-		requestBody, err := json.Marshal(bd)
-		if err != nil {
-			return nil, fmt.Errorf("encode: %s", err.Error())
-		}
-		bd.HTTP.Body = ioutil.NopCloser(bytes.NewBuffer(requestBody))
-	default:
-		// ADE:
-		bd.HTTP.Body = ioutil.NopCloser(bytes.NewBuffer(make([]byte, 0)))
-		//panic("unsupported encoding" + bd.HTTP.Header.Get("Content-Type"))
-	}
+	// switch bd.HTTP.Header.Get("Content-Type") {
+	// case "application/json":
+	// 	requestBody, err := json.Marshal(bd)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("encode: %s", err.Error())
+	// 	}
+	// 	bd.HTTP.Body = ioutil.NopCloser(bytes.NewBuffer(requestBody))
+	// default:
+	// 	// ADE:
+	// 	bd.HTTP.Body = ioutil.NopCloser(bytes.NewBuffer(make([]byte, 0)))
+	// 	//panic("unsupported encoding" + bd.HTTP.Header.Get("Content-Type"))
+	// }
 
 	return bd.HTTP, nil
 }
@@ -217,13 +214,4 @@ func unpack(data interface{}, into interface{}) error {
 	}
 
 	return d.Decode(data)
-}
-
-// RawJsonError is a json formatted error from a GraphQL server.
-type RawJsonError struct {
-	json.RawMessage
-}
-
-func (r RawJsonError) Error() string {
-	return string(r.RawMessage)
 }

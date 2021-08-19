@@ -41,7 +41,7 @@ func writeJSON(w io.Writer, r *graphql.Response) {
 	}
 
 	if len(r.Errors) > 0 {
-		var code int = 200
+		var code int = 500
 		for _, e := range r.Errors {
 			if e.Extensions != nil {
 				if n, ok := e.Extensions["code"]; ok {

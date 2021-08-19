@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/go-chi/chi/v5"
@@ -26,6 +27,7 @@ type RESTArgumentsType map[string]ArgumentsType
 var restOperation RESTOperationType
 var restSelection RESTSelectionType
 var restArguments RESTArgumentsType
+var restInputs RESTArgumentsType
 
 // 3. 全局错误码
 type ErrorCode int
@@ -35,10 +37,11 @@ const (
 	ErrInvalidParam = 400
 )
 
-func SetupHTTP2GraphQLMapping(operation RESTOperationType, selection RESTSelectionType, arguments RESTArgumentsType) {
+func SetupHTTP2GraphQLMapping(operation RESTOperationType, selection RESTSelectionType, arguments RESTArgumentsType, inputs RESTArgumentsType) {
 	restOperation = operation
 	restSelection = selection
 	restArguments = arguments
+	restInputs = inputs
 }
 
 // func get(key string) (string, bool) {
@@ -48,23 +51,66 @@ func SetupHTTP2GraphQLMapping(operation RESTOperationType, selection RESTSelecti
 // 	return "", false
 // }
 
+func formatParam(r *http.Request, argTypes ArgumentsType, k string, v interface{}) string {
+	argType, ok := argTypes[k]
+	if !ok {
+		DbgPrint(r, "formatParam %v %v %v", argTypes, k, v)
+		return ""
+	}
+	argType = strings.ReplaceAll(argType, "!", "")
+
+	var paramKV string
+	switch argType {
+	case "Boolean", "Int":
+		paramKV = fmt.Sprintf(`%s:%v`, k, v)
+	case "[Int]":
+		paramKV = fmt.Sprintf(`%s:[%v]`, k, v)
+	case "[ID]", "[String]":
+		paramKV = fmt.Sprintf(`%s:["%v"]`, k, v)
+	default:
+		if strings.HasSuffix(argType, "Input") {
+			queryParamsString := make([]string, 0)
+			queryParams, _ := v.(map[string]interface{})
+			for k, v := range queryParams {
+				if inputTypes, ok := restInputs[argType]; ok {
+					if paramKV := formatParam(r, inputTypes, k, v); paramKV != "" {
+						queryParamsString = append(queryParamsString, paramKV)
+					}
+				}
+			}
+			if len(queryParamsString) > 0 {
+				queryParamsStringX := strings.Join(queryParamsString, ",")
+				paramKV = fmt.Sprintf(`%s:{%v}`, k, queryParamsStringX)
+			}
+		} else if strings.HasSuffix(argType, "Type") {
+			paramKV = fmt.Sprintf(`%s:%v`, k, v)
+		} else {
+			paramKV = fmt.Sprintf(`%s:"%v"`, k, v)
+		}
+	}
+
+	return paramKV
+}
+
+type ParamType map[string]interface{}
+
 func HTTPRequest2GraphQLQuery(r *http.Request, params *graphql.RawParams, body []byte) (string, error) {
 	DbgPrint(r, "ADE: http.POST: %#v", r.URL.Path)
 	DbgPrint(r, "ADE: http.POST: %#v", r.URL.Query())
 
-	var bodyParams map[string]interface{}
+	var bodyParams ParamType
 	if len(body) > 0 {
 		r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
 		if err := jsonDecode(r.Body, &bodyParams); err != nil {
 			return "", err
 		}
 	} else {
-		bodyParams = make(map[string]interface{})
+		bodyParams = make(ParamType)
 	}
 
-	queryString := "mutation {"
+	queryString := "mutation { "
 	if r.Method == "GET" {
-		queryString = "query {"
+		queryString = "query { "
 	}
 	// 1. 命令
 	rctx := chi.RouteContext(r.Context())
@@ -75,36 +121,34 @@ func HTTPRequest2GraphQLQuery(r *http.Request, params *graphql.RawParams, body [
 		err := errors.New("FIXME: OOPS! no match operation. " + rctx.RoutePattern())
 		return "", err
 	}
-	queryString += operationName
+	queryString += operationName // "query { todos"
 
 	// 2. 参数
-	values := r.URL.Query()
-	for i, v := range rctx.URLParams.Keys {
-		values[v] = []string{rctx.URLParams.Values[i]}
-	}
-	//DbgPrint(r, "ADE: http.POST: %#v", values)
-
-	args := ""
-	for k, v := range values {
-		// TODO: 根据Schema定义格式化 Int Boolean Float
-		args += fmt.Sprintf(`%s:"%s",`, k, v[0]) // "{hosts(verbose:"[true]"){id,name}}"
-	}
-	if len(bodyParams) > 0 {
-		inputValue := ""
+	if argTypes, ok := restArguments[operationName]; ok {
+		queryParams := make(ParamType)
+		// 2.1 Query Parameters
+		for k, v := range r.URL.Query() {
+			queryParams[k] = v[0] // TODO：暂时不接受多值传递 // "{hosts(verbose:"[true]"){id,name}}"
+		}
+		// 2.2 Path Parameters
+		for i, k := range rctx.URLParams.Keys {
+			queryParams[k] = rctx.URLParams.Values[i]
+		}
+		// 2.3 Body Parameters
 		for k, v := range bodyParams {
-			// TODO: 列表的处理 [String] [Int]
-			if vs, ok := v.(string); ok {
-				inputValue += fmt.Sprintf(`%s:"%s",`, k, vs)
-			} else {
-				inputValue += fmt.Sprintf(`%s:%v,`, k, v)
+			queryParams[k] = v
+		}
+
+		queryParamsString := make([]string, 0)
+		for k, v := range queryParams {
+			if paramKV := formatParam(r, argTypes, k, v); paramKV != "" {
+				queryParamsString = append(queryParamsString, paramKV)
 			}
 		}
-		if inputValue != "" {
-			args += "input:{" + inputValue + "},"
+		if len(queryParamsString) > 0 {
+			queryParamsStringX := strings.Join(queryParamsString, ",")
+			queryString += "(" + queryParamsStringX + ")" // "query { todos(ids:[\"T9527\"],)"
 		}
-	}
-	if args != "" {
-		queryString += "(" + args[:len(args)-1] + ")"
 	}
 
 	// 3. 字段
@@ -113,8 +157,10 @@ func HTTPRequest2GraphQLQuery(r *http.Request, params *graphql.RawParams, body [
 		err := errors.New("FIXME: OOPS! no match selection. " + rctx.RoutePattern())
 		return "", err
 	}
-	queryString += selection
-	queryString += "}"
+	queryString += selection // "query { todos(ids:[\"T9527\"],){id,text,done,user{id}}"
+
+	// end of query or mutation
+	queryString += " }" // "query { todos(ids:[\"T9527\"],){id,text,done,user{id}} }"
 
 	DbgPrint(r, "ADE:http.POST: %s", queryString)
 	params.Query = queryString

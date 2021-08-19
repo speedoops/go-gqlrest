@@ -23,8 +23,9 @@ func RegisterHandlers(prefix string, r *chi.Mux, srv http.Handler) {
 	restSelection := make(handlerx.RESTSelectionType)
 	// GraphQL Operation => Arguments <Name,Type>
 	restArguments := make(handlerx.RESTArgumentsType)
+	// GraphQL Operation => Arguments <Name,Type>
+	restInputs := make(handlerx.RESTArgumentsType)
 
-	var methodArguments handlerx.ArgumentsType
 	{{ $root := . }}
 
 	// Query
@@ -44,7 +45,7 @@ func RegisterHandlers(prefix string, r *chi.Mux, srv http.Handler) {
 			{{- $selection := getSelection $root.Objects $field false -}}
 			restSelection["{{ $field.Name }}"] = "{{ $selection }}"
 
-			methodArguments = make(handlerx.ArgumentsType)	
+			methodArguments := make(handlerx.ArgumentsType)	
 			{{ range $arg := $field.Arguments -}}
 				methodArguments["{{ $arg.Name }}"] = "{{ $arg.Type}}"
 			{{ end -}}
@@ -70,7 +71,7 @@ func RegisterHandlers(prefix string, r *chi.Mux, srv http.Handler) {
 			{{- $selection := getSelection $root.Objects $field false -}}
 			restSelection["{{ $field.Name }}"] = "{{ $selection }}"
 
-			methodArguments = make(map[string]string)	
+			methodArguments := make(handlerx.ArgumentsType)	
 			{{ range $arg := $field.Arguments -}}
 				methodArguments["{{ $arg.Name }}"] = "{{ $arg.Type}}"
 			{{ end -}}
@@ -79,6 +80,17 @@ func RegisterHandlers(prefix string, r *chi.Mux, srv http.Handler) {
 		{{ end -}}
 	{{ end }}
 
-	handlerx.SetupHTTP2GraphQLMapping(restOperation, restSelection, restArguments)
+	// Input
+	{{ range $object := $root.Inputs -}}
+		{ // {{ $object.Name }}
+			inputArguments := make(handlerx.ArgumentsType)	
+			{{ range $arg := $object.Fields -}}
+				inputArguments["{{ $arg.Name }}"] = "{{ $arg.Type}}"
+			{{ end -}}
+			restInputs["{{ $object.Name }}"] = inputArguments
+		}
+	{{ end }}
+
+	handlerx.SetupHTTP2GraphQLMapping(restOperation, restSelection, restArguments, restInputs)
 }
 

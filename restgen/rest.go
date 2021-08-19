@@ -79,12 +79,21 @@ func DumpObject(objects *codegen.Objects, object *codegen.Object) {
 	}
 }
 
-func GetArguments(objects *codegen.Objects, field *codegen.Field) string {
+func Unused_GetArguments(objects *codegen.Objects, field *codegen.Field) string {
 	arguments := ""
 	for _, v := range field.Arguments {
-		arguments += fmt.Sprintf("%s %s", v.Name, v.Type)
+		arguments += fmt.Sprintf("%s %s; ", v.Name, v.Type)
 	}
 	return arguments
+}
+
+func Unused_GetInputs(data *codegen.Data) string {
+	inputs := ""
+	for _, v := range data.Inputs {
+		inputs += fmt.Sprintf("%s %s %v; ", v.Name, v.Type, v.Fields)
+	}
+
+	return ""
 }
 
 func GetSelection(objects *codegen.Objects, field *codegen.Field, refer bool) string {
@@ -218,9 +227,9 @@ func (m *Plugin) GenerateCode(data *codegen.Data) error {
 			"getSelection": func(objects *codegen.Objects, field *codegen.Field, refer bool) string {
 				return GetSelection(objects, field, refer)
 			},
-			"getArguments": func(objects *codegen.Objects, field *codegen.Field) string {
-				return GetArguments(objects, field)
-			},
+			// "getArguments": func(objects *codegen.Objects, field *codegen.Field) string {
+			// 	return GetArguments(objects, field)
+			// },
 			"getURL": func(field *codegen.Field) string {
 				return GetURL(field)
 			},
