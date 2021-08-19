@@ -30,8 +30,8 @@ func statusFor(errs gqlerror.List) int {
 type jsonResponse struct {
 	Code    int             `json:"code"`
 	Data    json.RawMessage `json:"data"`
-	Errors  gqlerror.List   `json:"errors"`
-	Message string          `json:"message"`
+	Errors  gqlerror.List   `json:"errors,omitempty"`
+	Message string          `json:"message,omitempty"`
 }
 
 func writeJSON(w io.Writer, r *graphql.Response) {

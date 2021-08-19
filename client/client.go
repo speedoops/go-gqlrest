@@ -23,9 +23,7 @@ type (
 
 	// Request represents an outgoing GraphQL request
 	Request struct {
-		Method string        `josn:"method"`
-		Target string        `json:"target"`
-		HTTP   *http.Request `json:"-"`
+		HTTP *http.Request
 	}
 
 	// Response is a GraphQL layer response from a handler.
@@ -172,8 +170,7 @@ func (p *Client) RawRequest(method string, target string, options ...Option) (*R
 
 func (p *Client) newRequest(method string, target string, options ...Option) (*http.Request, error) {
 	bd := &Request{
-		Target: target,
-		HTTP:   httptest.NewRequest(method, target, nil),
+		HTTP: httptest.NewRequest(method, target, nil),
 	}
 	bd.HTTP.Header.Set("Content-Type", "application/json")
 

@@ -13,11 +13,11 @@ func Body(payload string) Option {
 	}
 }
 
-// Path sets the url that this request will be made against, useful if you are mounting your entire router
+// Prefix sets the url that this request will be made against, useful if you are mounting your entire router
 // and need to specify the url to the graphql endpoint.
-func Path(url string) Option {
+func Prefix(urlPrefix string) Option {
 	return func(bd *Request) {
-		bd.HTTP.URL.Path = url
+		bd.HTTP.URL.Path = urlPrefix + bd.HTTP.URL.Path
 	}
 }
 

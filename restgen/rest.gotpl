@@ -40,7 +40,7 @@ func RegisterHandlers(prefix string, r *chi.Mux, srv http.Handler) {
 				{{ $method := getMethod $field "GET" -}}
 				r.Method({{ $method }}, prefix + {{ $url }}, srv)
 
-				restOperation[prefix + {{ $url }}] = "{{ $field.Name }}"
+				restOperation[{{ $method }} + ":" + prefix + {{ $url }}] = "{{ $field.Name }}"
 			{{ end -}}
 			{{- $selection := getSelection $root.Objects $field false -}}
 			restSelection["{{ $field.Name }}"] = "{{ $selection }}"
@@ -66,7 +66,7 @@ func RegisterHandlers(prefix string, r *chi.Mux, srv http.Handler) {
 				{{ $method := getMethod $field "POST" -}}
 				r.Method({{ $method }}, prefix + {{ $url }}, srv)
 				
-				restOperation[prefix + {{ $url }}] = "{{ $field.Name }}"
+				restOperation[{{ $method }} + ":" + prefix + {{ $url }}] = "{{ $field.Name }}"
 			{{ end -}}
 			{{- $selection := getSelection $root.Objects $field false -}}
 			restSelection["{{ $field.Name }}"] = "{{ $selection }}"

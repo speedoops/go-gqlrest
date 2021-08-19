@@ -116,7 +116,7 @@ func HTTPRequest2GraphQLQuery(r *http.Request, params *graphql.RawParams, body [
 	rctx := chi.RouteContext(r.Context())
 	routePattern := rctx.RoutePattern()
 	//routePattern = strings.TrimPrefix(routePattern, "/api/v1")
-	operationName, ok := restOperation[routePattern]
+	operationName, ok := restOperation[r.Method+":"+routePattern]
 	if !ok {
 		err := errors.New("FIXME: OOPS! no match operation. " + rctx.RoutePattern())
 		return "", err
