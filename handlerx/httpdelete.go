@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net/http"
-	"strings"
 
 	"github.com/99designs/gqlgen/graphql"
 )
@@ -26,26 +25,15 @@ func (h DELETE) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExe
 	// https://stackoverflow.com/questions/43021058/golang-read-request-body-multiple-times
 	r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
 
-	params := &graphql.RawParams{
-		Query:         r.URL.Query().Get("query"),
-		OperationName: r.URL.Query().Get("operationName"),
-	}
+	params := &graphql.RawParams{}
 	params.ReadTime.Start = graphql.Now()
-
-	if variables := r.URL.Query().Get("variables"); variables != "" {
-		if err := jsonDecode(strings.NewReader(variables), &params.Variables); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			writeJSONError(w, ErrDecodeJson, "variables could not be decoded")
-			return
-		}
-	}
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	if params.Query == "" { // 为空时是普通 REST 请求，需要组装 Query
 		queryString, err := HTTPRequest2GraphQLQuery(r, params, body)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			writeJSONErrorf(w, ErrDecodeJson, "json body could not be decoded: "+err.Error())
+			writeJSONErrorf(w, ErrDecodeJson, "query body could not be parsed: "+err.Error())
 			return
 		}
 		params.Query = queryString
@@ -54,7 +42,7 @@ func (h DELETE) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExe
 
 	params.ReadTime.End = graphql.Now()
 
-	DbgPrint(r, "ADE: http.GET: %#v", params)
+	DbgPrint(r, "ADE: http.DELETE: %#v", params)
 
 	rc, err := exec.CreateOperationContext(r.Context(), params)
 	if err != nil {

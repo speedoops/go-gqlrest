@@ -33,7 +33,7 @@ var restInputs RESTArgumentsType
 type ErrorCode int
 
 const (
-	ErrDecodeJson   = 500
+	ErrDecodeJson   = 422
 	ErrInvalidParam = 400
 )
 

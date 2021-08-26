@@ -47,7 +47,7 @@ func (h POST) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecu
 		queryString, err := HTTPRequest2GraphQLQuery(r, params, body)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			writeJSONErrorf(w, ErrDecodeJson, "json body could not be decoded: "+err.Error())
+			writeJSONErrorf(w, ErrDecodeJson, "query body could not be parsed: "+err.Error())
 			return
 		}
 		params.Query = queryString
