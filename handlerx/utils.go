@@ -34,14 +34,14 @@ type jsonResponse struct {
 	Message string          `json:"message,omitempty"`
 }
 
-func writeJSON(w io.Writer, r *graphql.Response, needStrippResponse bool) {
+func writeJSON(w io.Writer, r *graphql.Response, isRESTful bool) {
 	response := &jsonResponse{
 		Code:   200,
 		Errors: r.Errors,
 		Data:   r.Data,
 	}
 
-	if needStrippResponse && len(r.Data) > 0 {
+	if isRESTful && len(r.Data) > 0 {
 		var m map[string]json.RawMessage
 		err := json.Unmarshal(r.Data, &m)
 		if err != nil {

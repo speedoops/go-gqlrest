@@ -43,15 +43,16 @@ func (h POST) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecu
 	}
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	isRestRequest := false
-	if params.Query == "" { // 为空时是普通 REST 请求，需要组装 Query
+	isRESTful := false
+	if params.Query == "" { // This is a RESTful request, convert it to GraphQL query
+		isRESTful = true
+
 		queryString, err := HTTPRequest2GraphQLQuery(r, params, body)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			writeJSONErrorf(w, ErrDecodeJson, "query body could not be parsed: "+err.Error())
 			return
 		}
-		isRestRequest = true
 		params.Query = queryString
 	}
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -65,7 +66,7 @@ func (h POST) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecu
 	if err != nil {
 		w.WriteHeader(statusFor(err))
 		resp := exec.DispatchError(graphql.WithOperationContext(r.Context(), rc), err)
-		writeJSON(w, resp, isRestRequest)
+		writeJSON(w, resp, isRESTful)
 		return
 	}
 
@@ -78,5 +79,5 @@ func (h POST) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecu
 
 	ctx := graphql.WithOperationContext(r.Context(), rc)
 	responses, ctx := exec.DispatchOperation(ctx, rc)
-	writeJSON(w, responses(ctx), isRestRequest)
+	writeJSON(w, responses(ctx), isRESTful)
 }
