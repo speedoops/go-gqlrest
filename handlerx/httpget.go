@@ -48,6 +48,7 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 	}
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	isRestRequest := false
 	if params.Query == "" { // 为空时是普通 REST 请求，需要组装 Query
 		queryString, err := HTTPRequest2GraphQLQuery(r, params, nil)
 		if err != nil {
@@ -55,6 +56,7 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 			writeJSONErrorf(w, ErrDecodeJson, "json body could not be decoded: "+err.Error())
 			return
 		}
+		isRestRequest = true
 		params.Query = queryString
 	}
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -67,7 +69,7 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 	if err != nil {
 		w.WriteHeader(statusFor(err))
 		resp := exec.DispatchError(graphql.WithOperationContext(r.Context(), rc), err)
-		writeJSON(w, resp)
+		writeJSON(w, resp, isRestRequest)
 		return
 	}
 
@@ -80,5 +82,5 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 	}
 
 	responses, ctx := exec.DispatchOperation(r.Context(), rc)
-	writeJSON(w, responses(ctx))
+	writeJSON(w, responses(ctx), isRestRequest)
 }

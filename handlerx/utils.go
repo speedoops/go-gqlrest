@@ -34,11 +34,27 @@ type jsonResponse struct {
 	Message string          `json:"message,omitempty"`
 }
 
-func writeJSON(w io.Writer, r *graphql.Response) {
+func writeJSON(w io.Writer, r *graphql.Response, needStrippResponse bool) {
 	response := &jsonResponse{
 		Code:   200,
 		Errors: r.Errors,
 		Data:   r.Data,
+	}
+
+	if needStrippResponse && len(r.Data) > 0 {
+		var m map[string]json.RawMessage
+		err := json.Unmarshal(r.Data, &m)
+		if err != nil {
+			panic(err)
+		}
+
+		if len(m) > 1 {
+			panic("response data have more than one key")
+		}
+
+		for _, v := range m {
+			response.Data = v
+		}
 	}
 
 	if len(r.Errors) > 0 {
@@ -79,7 +95,7 @@ func writeJSONError(w io.Writer, code ErrorCode, msg string) {
 			"code": code,
 		},
 		Errors: gqlerror.List{{Message: msg}},
-	})
+	}, false)
 }
 
 func writeJSONErrorf(w io.Writer, code ErrorCode, format string, args ...interface{}) {
@@ -88,7 +104,7 @@ func writeJSONErrorf(w io.Writer, code ErrorCode, format string, args ...interfa
 			"code": code,
 		},
 		Errors: gqlerror.List{{Message: fmt.Sprintf(format, args...)}},
-	})
+	}, false)
 }
 
 func writeJSONGraphqlError(w io.Writer, code ErrorCode, err ...*gqlerror.Error) {
@@ -97,5 +113,5 @@ func writeJSONGraphqlError(w io.Writer, code ErrorCode, err ...*gqlerror.Error) 
 			"code": code,
 		},
 		Errors: err,
-	})
+	}, false)
 }
