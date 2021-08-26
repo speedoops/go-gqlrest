@@ -106,12 +106,3 @@ func writeJSONErrorf(w io.Writer, code ErrorCode, format string, args ...interfa
 		Errors: gqlerror.List{{Message: fmt.Sprintf(format, args...)}},
 	}, false)
 }
-
-func writeJSONGraphqlError(w io.Writer, code ErrorCode, err ...*gqlerror.Error) {
-	writeJSON(w, &graphql.Response{
-		Extensions: map[string]interface{}{
-			"code": code,
-		},
-		Errors: err,
-	}, false)
-}
