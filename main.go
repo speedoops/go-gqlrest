@@ -6,7 +6,7 @@ import (
 
 	"github.com/99designs/gqlgen/api"
 	"github.com/99designs/gqlgen/codegen/config"
-	"github.com/speedoops/gql2rest/restgen"
+	"github.com/speedoops/gqlrest/restgen"
 )
 
 func main() {

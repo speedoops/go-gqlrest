@@ -60,6 +60,10 @@ func (p *Client) Get(target string, response interface{}, options ...Option) err
 		return err
 	}
 
+	if response == nil {
+		return nil
+	}
+
 	// we want to unpack even if there is an error, so we can see partial responses
 	unpackErr := unpack(respDataRaw.Data, response)
 
@@ -82,6 +86,10 @@ func (p *Client) Post(target string, response interface{}, options ...Option) er
 	respDataRaw, err := p.RawRequest(http.MethodPost, target, options...)
 	if err != nil {
 		return err
+	}
+
+	if response == nil {
+		return nil
 	}
 
 	// we want to unpack even if there is an error, so we can see partial responses
@@ -108,6 +116,10 @@ func (p *Client) Put(target string, response interface{}, options ...Option) err
 		return err
 	}
 
+	if response == nil {
+		return nil
+	}
+
 	// we want to unpack even if there is an error, so we can see partial responses
 	unpackErr := unpack(respDataRaw.Data, response)
 
@@ -130,6 +142,10 @@ func (p *Client) Delete(target string, response interface{}, options ...Option) 
 	respDataRaw, err := p.RawRequest(http.MethodDelete, target, options...)
 	if err != nil {
 		return err
+	}
+
+	if response == nil {
+		return nil
 	}
 
 	// we want to unpack even if there is an error, so we can see partial responses
@@ -200,15 +216,21 @@ func (p *Client) newRequest(method string, target string, options ...Option) (*h
 }
 
 func unpack(data interface{}, into interface{}) error {
+	var metadata mapstructure.Metadata
 	d, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		Result:      into,
 		TagName:     "json",
 		ErrorUnused: true,
 		ZeroFields:  true,
+		Metadata:    &metadata,
 	})
 	if err != nil {
 		return fmt.Errorf("mapstructure: %s", err.Error())
 	}
 
-	return d.Decode(data)
+	err = d.Decode(data)
+	if err != nil {
+		return fmt.Errorf("mapstructure %s. data='%s', meta='%s'", err.Error(), data, metadata)
+	}
+	return err
 }
