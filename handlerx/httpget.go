@@ -52,7 +52,7 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 	if params.Query == "" { // This is a RESTful request, convert it to GraphQL query
 		isRESTful = true
 
-		queryString, err := HTTPRequest2GraphQLQuery(r, params, nil)
+		queryString, err := convertHTTPRequestToGraphQLQuery(r, params, nil)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			writeJSONErrorf(w, ErrDecodeJson, "json body could not be decoded: "+err.Error())

@@ -57,7 +57,7 @@ func writeJSON(w io.Writer, r *graphql.Response, isRESTful bool) {
 		}
 
 		// 3. mapping or squashing
-		if v[0] == '[' {
+		if len(v) > 0 && v[0] == '[' {
 			// if it is a slice, change member name to 'list'
 			delete(m, k)
 			m["list"] = v

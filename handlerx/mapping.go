@@ -12,24 +12,18 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// 1. 类型声明
+// 1. Global Declaration
 // REST URL => GraphQL Operation
-type RESTOperationType map[string]string
+type RESTOperationMappingType map[string]string
 
 // GraphQL Operation => Fields Selection
-type RESTSelectionType map[string]string
+type RESTSelectionMappingType map[string]string
 
 // GraphQL Operation => Operation Arguments Pair of <ArgName,ArgType>
-type ArgumentsType map[string]string
-type RESTArgumentsType map[string]ArgumentsType
+type RESTArgumentsMappingType map[string]ArgNameArgTypePair
+type ArgNameArgTypePair map[string]string
 
-// 2. 全局变量
-var restOperation RESTOperationType
-var restSelection RESTSelectionType
-var restArguments RESTArgumentsType
-var restInputs RESTArgumentsType
-
-// 3. 全局错误码
+// 2. Global Error Codes
 type ErrorCode int
 
 const (
@@ -37,21 +31,21 @@ const (
 	ErrInvalidParam = 400
 )
 
-func SetupHTTP2GraphQLMapping(operation RESTOperationType, selection RESTSelectionType, arguments RESTArgumentsType, inputs RESTArgumentsType) {
+// local variables
+var restOperation RESTOperationMappingType
+var restSelection RESTSelectionMappingType
+var restArguments RESTArgumentsMappingType
+var restArgInputs RESTArgumentsMappingType
+
+func SetupHTTP2GraphQLMapping(operation RESTOperationMappingType, selection RESTSelectionMappingType,
+	arguments RESTArgumentsMappingType, argInputs RESTArgumentsMappingType) {
 	restOperation = operation
 	restSelection = selection
 	restArguments = arguments
-	restInputs = inputs
+	restArgInputs = argInputs
 }
 
-// func get(key string) (string, bool) {
-// 	if gql, ok := restSelection[key]; ok {
-// 		return gql, true
-// 	}
-// 	return "", false
-// }
-
-func formatParam(r *http.Request, argTypes ArgumentsType, k string, v interface{}) string {
+func convertFromJSONToGraphQL(r *http.Request, argTypes ArgNameArgTypePair, k string, v interface{}) string {
 	argType, ok := argTypes[k]
 	if !ok {
 		DbgPrint(r, "formatParam %v %v %v", argTypes, k, v)
@@ -72,8 +66,8 @@ func formatParam(r *http.Request, argTypes ArgumentsType, k string, v interface{
 			queryParamsString := make([]string, 0)
 			queryParams, _ := v.(map[string]interface{})
 			for k, v := range queryParams {
-				if inputTypes, ok := restInputs[argType]; ok {
-					if paramKV := formatParam(r, inputTypes, k, v); paramKV != "" {
+				if inputTypes, ok := restArgInputs[argType]; ok {
+					if paramKV := convertFromJSONToGraphQL(r, inputTypes, k, v); paramKV != "" {
 						queryParamsString = append(queryParamsString, paramKV)
 					}
 				}
@@ -94,7 +88,7 @@ func formatParam(r *http.Request, argTypes ArgumentsType, k string, v interface{
 
 type ParamType map[string]interface{}
 
-func HTTPRequest2GraphQLQuery(r *http.Request, params *graphql.RawParams, body []byte) (string, error) {
+func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams, body []byte) (string, error) {
 	DbgPrint(r, "ADE: http.POST: %#v", r.URL.Path)
 	DbgPrint(r, "ADE: http.POST: %#v", r.URL.Query())
 
@@ -112,7 +106,8 @@ func HTTPRequest2GraphQLQuery(r *http.Request, params *graphql.RawParams, body [
 	if r.Method == "GET" {
 		queryString = "query { "
 	}
-	// 1. 命令
+
+	// 1. Operation Name
 	rctx := chi.RouteContext(r.Context())
 	routePattern := rctx.RoutePattern()
 	//routePattern = strings.TrimPrefix(routePattern, "/api/v1")
@@ -121,14 +116,14 @@ func HTTPRequest2GraphQLQuery(r *http.Request, params *graphql.RawParams, body [
 		err := errors.New("FIXME: OOPS! no match operation. " + rctx.RoutePattern())
 		return "", err
 	}
-	queryString += operationName // "query { todos"
+	queryString += operationName // eg. "query { todos"
 
-	// 2. 参数
+	// 2. Query Parameters
 	if argTypes, ok := restArguments[operationName]; ok {
 		queryParams := make(ParamType)
 		// 2.1 Query Parameters
 		for k, v := range r.URL.Query() {
-			queryParams[k] = v[0] // TODO：暂时不接受多值传递 // "{hosts(verbose:"[true]"){id,name}}"
+			queryParams[k] = v[0] // TODO：don't support multiple values for one key
 		}
 		// 2.2 Path Parameters
 		for i, k := range rctx.URLParams.Keys {
@@ -141,26 +136,26 @@ func HTTPRequest2GraphQLQuery(r *http.Request, params *graphql.RawParams, body [
 
 		queryParamsString := make([]string, 0)
 		for k, v := range queryParams {
-			if paramKV := formatParam(r, argTypes, k, v); paramKV != "" {
+			if paramKV := convertFromJSONToGraphQL(r, argTypes, k, v); paramKV != "" {
 				queryParamsString = append(queryParamsString, paramKV)
 			}
 		}
 		if len(queryParamsString) > 0 {
 			queryParamsStringX := strings.Join(queryParamsString, ",")
-			queryString += "(" + queryParamsStringX + ")" // "query { todos(ids:[\"T9527\"],)"
+			queryString += "(" + queryParamsStringX + ")" // eg. "query { todos(ids:[\"T9527\"],)"
 		}
 	}
 
-	// 3. 字段
+	// 3. Field Selection
 	selection, ok := restSelection[operationName]
 	if !ok {
 		err := errors.New("FIXME: OOPS! no match selection. " + rctx.RoutePattern())
 		return "", err
 	}
-	queryString += selection // "query { todos(ids:[\"T9527\"],){id,text,done,user{id}}"
+	queryString += selection // eg. "query { todos(ids:[\"T9527\"],){id,text,done,user{id}}"
 
 	// end of query or mutation
-	queryString += " }" // "query { todos(ids:[\"T9527\"],){id,text,done,user{id}} }"
+	queryString += " }" // eg. "query { todos(ids:[\"T9527\"],){id,text,done,user{id}} }"
 
 	DbgPrint(r, "ADE:http.POST: %s", queryString)
 	params.Query = queryString

@@ -33,7 +33,7 @@ func (h DELETE) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExe
 	if params.Query == "" { // This is a RESTful request, convert it to GraphQL query
 		isRESTful = true
 
-		queryString, err := HTTPRequest2GraphQLQuery(r, params, body)
+		queryString, err := convertHTTPRequestToGraphQLQuery(r, params, body)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			writeJSONErrorf(w, ErrDecodeJson, "query body could not be parsed: "+err.Error())
