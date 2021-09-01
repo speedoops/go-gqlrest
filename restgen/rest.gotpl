@@ -14,7 +14,7 @@
 {{ reserveImport "github.com/99designs/gqlgen/graphql" }}
 {{ reserveImport "github.com/99designs/gqlgen/graphql/introspection" }}
 {{ reserveImport "github.com/go-chi/chi/v5" }}
-{{ reserveImport "github.com/speedoops/gql2rest/handlerx" }}
+{{ reserveImport "github.com/speedoops/go-gqlrest/handlerx" }}
 
 func RegisterHandlers(prefix string, r *chi.Mux, srv http.Handler) {
 	// REST URL => GraphQL Operation
