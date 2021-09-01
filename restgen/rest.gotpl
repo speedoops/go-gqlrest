@@ -16,7 +16,7 @@
 {{ reserveImport "github.com/go-chi/chi/v5" }}
 {{ reserveImport "github.com/speedoops/go-gqlrest/handlerx" }}
 
-func RegisterHandlers(prefix string, r *chi.Mux, srv http.Handler) {
+func RegisterHandlers(r *chi.Mux, srv http.Handler, prefix string) {
 	// REST URL => GraphQL Operation
 	restOperation := make(handlerx.RESTOperationMappingType)
 	// GraphQL Operation => Fields Selection
