@@ -38,7 +38,11 @@ func (m *Plugin) MutateConfig(cfg *config.Config) error {
 
 // ADE:
 func DbgPrintln(a ...interface{}) {
-	fmt.Println(a...)
+	//fmt.Println(a...)
+}
+
+func DbgPrintf(format string, a ...interface{}) {
+	//fmt.Printf(format, a...)
 }
 
 func DumpObject(objects *codegen.Objects, object *codegen.Object) {
@@ -50,10 +54,10 @@ func DumpObject(objects *codegen.Objects, object *codegen.Object) {
 	// data.QueryRoot.Fields
 	// _ = data.Objects[0].Fields[0].ShortResolverDeclaration()
 	// _ = data.Objects[0].Fields[0].Arguments[0].Name
-	fmt.Printf("\n=> objects: %#v\n", object.Type)
+	DbgPrintf("\n=> objects: %#v\n", object.Type)
 
 	for _, field := range object.Fields {
-		fmt.Println("=> field:", field.Name, GetSelection(objects, field, false))
+		DbgPrintln("=> field:", field.Name, GetSelection(objects, field, false))
 		// 	fmt.Println("=> field:", field.Object.Name, field.Name, field.FieldDefinition.Directives)
 		// 	if strings.HasPrefix(field.Name, "__") {
 		// 		continue
@@ -123,7 +127,7 @@ func GetSelection(objects *codegen.Objects, field *codegen.Field, refer bool) st
 
 	innerSelections := make([]string, 0)
 	for _, innerField := range field.TypeReference.Definition.Fields {
-		fmt.Println("..innerField:", innerField.Name, innerField.Type)
+		DbgPrintln("..innerField:", innerField.Name, innerField.Type)
 		innerDirective := innerField.Directives.ForName("hide")
 		if innerDirective != nil {
 			DbgPrintln("..innerField.directive:", innerDirective.Name, ShouldHide(innerDirective))

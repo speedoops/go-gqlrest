@@ -28,6 +28,8 @@ type (
 
 	// Response is a GraphQL layer response from a handler.
 	Response struct {
+		Code       int
+		Message    string
 		Data       interface{}
 		Errors     json.RawMessage
 		Extensions map[string]interface{}
@@ -126,6 +128,11 @@ func (p *Client) Put(target string, response interface{}, options ...Option) err
 	if respDataRaw.Errors != nil {
 		return RawJsonError{respDataRaw.Errors}
 	}
+
+	if respDataRaw.Code != 200 {
+		return fmt.Errorf("http %d: %s", respDataRaw.Code, respDataRaw.Message)
+	}
+
 	return unpackErr
 }
 

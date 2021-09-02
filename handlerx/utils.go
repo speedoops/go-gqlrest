@@ -32,8 +32,8 @@ func statusFor(errs gqlerror.List) int {
 // @see graphql.Response
 type RESTResponse struct {
 	Code    int             `json:"code"`
-	Data    json.RawMessage `json:"data"`
 	Message string          `json:"message,omitempty"`
+	Data    json.RawMessage `json:"data"`
 }
 
 func writeJSON(w io.Writer, r *graphql.Response, isRESTful bool) {

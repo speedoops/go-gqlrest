@@ -15,6 +15,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "failed to load config", err.Error())
 		os.Exit(2)
 	}
+	fmt.Printf("%#v", cfg)
 
 	err = api.Generate(cfg,
 		api.AddPlugin(restgen.New("graph/generated/rest.go", "Query")), // This is the magic line
