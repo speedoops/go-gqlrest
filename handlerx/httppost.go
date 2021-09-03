@@ -71,10 +71,10 @@ func (h POST) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecu
 	}
 
 	if rc.Operation.Name != "IntrospectionQuery" {
-		DbgPrint(r, "ADE: http.POST: %#v", r.URL.Path)
-		DbgPrint(r, "ADE: http.POST: %#v", r.URL.Query())
-		DbgPrint(r, "ADE: http.POST: %#v", params)
-		DbgPrint(r, "ADE: http.POST: %s, %#v", rc.Operation.Name, rc)
+		DbgPrintf(r, "ADE: http.POST: %#v", r.URL.Path)
+		DbgPrintf(r, "ADE: http.POST: %#v", r.URL.Query())
+		DbgPrintf(r, "ADE: http.POST: %#v", params)
+		DbgPrintf(r, "ADE: http.POST: %s, %#v", rc.Operation.Name, rc)
 	}
 
 	ctx := graphql.WithOperationContext(r.Context(), rc)

@@ -68,9 +68,11 @@ func (p *Client) Get(target string, response interface{}, options ...Option) err
 
 	// we want to unpack even if there is an error, so we can see partial responses
 	unpackErr := unpack(respDataRaw.Data, response)
-
 	if respDataRaw.Errors != nil {
 		return RawJsonError{respDataRaw.Errors}
+	}
+	if respDataRaw.Code != 200 {
+		return fmt.Errorf("code %d: %s", respDataRaw.Code, respDataRaw.Message)
 	}
 	return unpackErr
 }
@@ -96,9 +98,11 @@ func (p *Client) Post(target string, response interface{}, options ...Option) er
 
 	// we want to unpack even if there is an error, so we can see partial responses
 	unpackErr := unpack(respDataRaw.Data, response)
-
 	if respDataRaw.Errors != nil {
 		return RawJsonError{respDataRaw.Errors}
+	}
+	if respDataRaw.Code != 200 {
+		return fmt.Errorf("code %d: %s", respDataRaw.Code, respDataRaw.Message)
 	}
 	return unpackErr
 }
@@ -124,15 +128,12 @@ func (p *Client) Put(target string, response interface{}, options ...Option) err
 
 	// we want to unpack even if there is an error, so we can see partial responses
 	unpackErr := unpack(respDataRaw.Data, response)
-
 	if respDataRaw.Errors != nil {
 		return RawJsonError{respDataRaw.Errors}
 	}
-
 	if respDataRaw.Code != 200 {
-		return fmt.Errorf("http %d: %s", respDataRaw.Code, respDataRaw.Message)
+		return fmt.Errorf("code %d: %s", respDataRaw.Code, respDataRaw.Message)
 	}
-
 	return unpackErr
 }
 
@@ -157,9 +158,11 @@ func (p *Client) Delete(target string, response interface{}, options ...Option) 
 
 	// we want to unpack even if there is an error, so we can see partial responses
 	unpackErr := unpack(respDataRaw.Data, response)
-
 	if respDataRaw.Errors != nil {
 		return RawJsonError{respDataRaw.Errors}
+	}
+	if respDataRaw.Code != 200 {
+		return fmt.Errorf("code %d: %s", respDataRaw.Code, respDataRaw.Message)
 	}
 	return unpackErr
 }
@@ -205,19 +208,6 @@ func (p *Client) newRequest(method string, target string, options ...Option) (*h
 	for _, option := range options {
 		option(bd)
 	}
-
-	// switch bd.HTTP.Header.Get("Content-Type") {
-	// case "application/json":
-	// 	requestBody, err := json.Marshal(bd)
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("encode: %s", err.Error())
-	// 	}
-	// 	bd.HTTP.Body = ioutil.NopCloser(bytes.NewBuffer(requestBody))
-	// default:
-	// 	// ADE:
-	// 	bd.HTTP.Body = ioutil.NopCloser(bytes.NewBuffer(make([]byte, 0)))
-	// 	//panic("unsupported encoding" + bd.HTTP.Header.Get("Content-Type"))
-	// }
 
 	return bd.HTTP, nil
 }

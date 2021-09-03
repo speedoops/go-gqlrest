@@ -2,6 +2,7 @@ package restgen
 
 import (
 	"fmt"
+	"log"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -36,13 +37,18 @@ func (m *Plugin) MutateConfig(cfg *config.Config) error {
 	return nil
 }
 
-// ADE:
+var debug bool
+
 func DbgPrintln(a ...interface{}) {
-	//fmt.Println(a...)
+	if debug {
+		log.Println(a...)
+	}
 }
 
 func DbgPrintf(format string, a ...interface{}) {
-	//fmt.Printf(format, a...)
+	if debug {
+		log.Printf(format, a...)
+	}
 }
 
 func DumpObject(objects *codegen.Objects, object *codegen.Object) {

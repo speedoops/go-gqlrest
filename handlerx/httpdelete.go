@@ -45,7 +45,7 @@ func (h DELETE) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExe
 
 	params.ReadTime.End = graphql.Now()
 
-	DbgPrint(r, "ADE: http.DELETE: %#v", params)
+	DbgPrintf(r, "ADE: http.DELETE: %#v", params)
 
 	rc, err := exec.CreateOperationContext(r.Context(), params)
 	if err != nil {

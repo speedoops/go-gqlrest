@@ -64,7 +64,7 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 
 	params.ReadTime.End = graphql.Now()
 
-	DbgPrint(r, "ADE: http.GET: %#v", params)
+	DbgPrintf(r, "ADE: http.GET: %#v", params)
 
 	rc, err := exec.CreateOperationContext(r.Context(), params)
 	if err != nil {
@@ -74,7 +74,7 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 		return
 	}
 
-	DbgPrint(r, "http.GET: %#v", rc)
+	DbgPrintf(r, "http.GET: %#v", rc)
 	op := rc.Doc.Operations.ForName(rc.OperationName)
 	if op.Operation != ast.Query {
 		w.WriteHeader(http.StatusNotAcceptable)

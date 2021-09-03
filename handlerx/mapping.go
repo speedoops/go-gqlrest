@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strings"
 
@@ -45,10 +46,102 @@ func SetupHTTP2GraphQLMapping(operation RESTOperationMappingType, selection REST
 	restArgInputs = argInputs
 }
 
+func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams, body []byte) (string, error) {
+	DbgPrintf(r, "ADE: http.POST: %#v", r.URL.Path)
+	DbgPrintf(r, "ADE: http.POST: %#v", r.URL.Query())
+
+	var bodyParams map[string]interface{}
+	if len(body) > 0 {
+		r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+		if err := jsonDecode(r.Body, &bodyParams); err != nil {
+			return "", err
+		}
+	} else {
+		bodyParams = make(map[string]interface{})
+	}
+
+	queryString := "mutation { "
+	if r.Method == "GET" {
+		queryString = "query { "
+	}
+
+	// 1. Operation Name
+	rctx := chi.RouteContext(r.Context())
+	routePattern := rctx.RoutePattern()
+	operationName, ok := restOperation[r.Method+":"+routePattern]
+	if !ok {
+		err := errors.New("unknown operation: " + rctx.RoutePattern())
+		return "", err
+	}
+	queryString += operationName // eg. "query { todos"
+
+	// 2. Query Parameters
+	if argTypes, ok := restArguments[operationName]; ok {
+		queryParams := make(map[string]interface{})
+		inputParams := make(map[string]interface{})
+		// 2.1 Query Parameters (GET/POST/PUT/DELETE)
+		for k, v := range r.URL.Query() {
+			inputParams[k] = v[0] // only accecpt one value for each key
+			queryParams[k] = v[0] // key=[v1,v2,v3] works
+		}
+		// 2.2 Path Parameters (GET/POST/PUT/DELETE)
+		for i, k := range rctx.URLParams.Keys {
+			v := rctx.URLParams.Values[i]
+			// if strings.HasPrefix(v, "input.") {
+			// 	v = strings.Replace(v, "input.", "", 1)
+			// 	inputParams[k] = v
+			// } else {
+			// 	queryParams[k] = v
+			// }
+			inputParams[k] = v
+			queryParams[k] = v
+		}
+		// 2.3 Body Parameters (POST/PUT)
+		for k, v := range bodyParams {
+			if k == "input" {
+				innerParams, _ := v.(map[string]interface{})
+				for ik, iv := range innerParams {
+					inputParams[ik] = iv
+				}
+				continue
+			}
+			inputParams[k] = v
+		}
+		queryParams["input"] = inputParams
+
+		queryParamsString := make([]string, 0)
+		for k, v := range queryParams {
+			if paramKV := convertFromJSONToGraphQL(r, argTypes, k, v); paramKV != "" {
+				queryParamsString = append(queryParamsString, paramKV)
+			}
+		}
+		if len(queryParamsString) > 0 {
+			queryParamsStringX := strings.Join(queryParamsString, ",")
+			queryString += "(" + queryParamsStringX + ")" // eg. "query { todos(ids:[\"T9527\"],)"
+		}
+	}
+
+	// 3. Field Selection
+	selection, ok := restSelection[operationName]
+	if !ok {
+		err := errors.New("FIXME: OOPS! no match selection. " + rctx.RoutePattern())
+		return "", err
+	}
+	queryString += selection // eg. "query { todos(ids:[\"T9527\"],){id,text,done,user{id}}"
+
+	// end of query or mutation
+	queryString += " }" // eg. "query { todos(ids:[\"T9527\"],){id,text,done,user{id}} }"
+
+	DbgPrintf(r, "ADE:http.POST: %s", queryString)
+	params.Query = queryString
+
+	return queryString, nil
+}
+
 func convertFromJSONToGraphQL(r *http.Request, argTypes ArgNameArgTypePair, k string, v interface{}) string {
 	argType, ok := argTypes[k]
 	if !ok {
-		DbgPrint(r, "formatParam %v %v %v", argTypes, k, v)
+		DbgPrintf(r, "formatParam %v %v %v", argTypes, k, v)
 		return ""
 	}
 	argType = strings.ReplaceAll(argType, "!", "")
@@ -86,86 +179,10 @@ func convertFromJSONToGraphQL(r *http.Request, argTypes ArgNameArgTypePair, k st
 	return paramKV
 }
 
-type ParamType map[string]interface{}
+var debug bool = false
 
-func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams, body []byte) (string, error) {
-	DbgPrint(r, "ADE: http.POST: %#v", r.URL.Path)
-	DbgPrint(r, "ADE: http.POST: %#v", r.URL.Query())
-
-	var bodyParams ParamType
-	if len(body) > 0 {
-		r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
-		if err := jsonDecode(r.Body, &bodyParams); err != nil {
-			return "", err
-		}
-	} else {
-		bodyParams = make(ParamType)
+func DbgPrintf(r *http.Request, format string, v ...interface{}) {
+	if debug && len(r.URL.Query()) > 0 {
+		log.Printf(format, v...)
 	}
-
-	queryString := "mutation { "
-	if r.Method == "GET" {
-		queryString = "query { "
-	}
-
-	// 1. Operation Name
-	rctx := chi.RouteContext(r.Context())
-	routePattern := rctx.RoutePattern()
-	//routePattern = strings.TrimPrefix(routePattern, "/api/v1")
-	operationName, ok := restOperation[r.Method+":"+routePattern]
-	if !ok {
-		err := errors.New("FIXME: OOPS! no match operation. " + rctx.RoutePattern())
-		return "", err
-	}
-	queryString += operationName // eg. "query { todos"
-
-	// 2. Query Parameters
-	if argTypes, ok := restArguments[operationName]; ok {
-		queryParams := make(ParamType)
-		// 2.1 Query Parameters
-		for k, v := range r.URL.Query() {
-			queryParams[k] = v[0] // TODO：don't support multiple values for one key
-		}
-		// 2.2 Path Parameters
-		for i, k := range rctx.URLParams.Keys {
-			queryParams[k] = rctx.URLParams.Values[i]
-		}
-		// 2.3 Body Parameters
-		for k, v := range bodyParams {
-			queryParams[k] = v
-		}
-
-		queryParamsString := make([]string, 0)
-		for k, v := range queryParams {
-			if paramKV := convertFromJSONToGraphQL(r, argTypes, k, v); paramKV != "" {
-				queryParamsString = append(queryParamsString, paramKV)
-			}
-		}
-		if len(queryParamsString) > 0 {
-			queryParamsStringX := strings.Join(queryParamsString, ",")
-			queryString += "(" + queryParamsStringX + ")" // eg. "query { todos(ids:[\"T9527\"],)"
-		}
-	}
-
-	// 3. Field Selection
-	selection, ok := restSelection[operationName]
-	if !ok {
-		err := errors.New("FIXME: OOPS! no match selection. " + rctx.RoutePattern())
-		return "", err
-	}
-	queryString += selection // eg. "query { todos(ids:[\"T9527\"],){id,text,done,user{id}}"
-
-	// end of query or mutation
-	queryString += " }" // eg. "query { todos(ids:[\"T9527\"],){id,text,done,user{id}} }"
-
-	DbgPrint(r, "ADE:http.POST: %s", queryString)
-	params.Query = queryString
-
-	return queryString, nil
-}
-
-func DbgPrint(r *http.Request, format string, v ...interface{}) {
-	//if config.GraphQL.Debug.EnableVerbose && len(r.URL.Query()) > 0 {
-	//logx.Infof(format, v...)
-	//}
-	//fmt.Printf(format+"\n", v...)
 }
