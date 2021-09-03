@@ -45,7 +45,6 @@ func writeJSON(w io.Writer, r *graphql.Response, isRESTful bool) {
 		}
 		_, err = w.Write(b)
 		if err != nil {
-			//logx.Errorf("an io write error occurred: %v", err)
 			panic(err)
 		}
 		return
@@ -76,7 +75,7 @@ func writeJSON(w io.Writer, r *graphql.Response, isRESTful bool) {
 		if len(v) > 0 && v[0] == '[' {
 			// if it is a slice, change member name to 'list'
 			delete(m, k)
-			m["list"] = v
+			m["results"] = v
 			response.Data, _ = json.Marshal(m)
 		} else {
 			// else, set data to it's first child
