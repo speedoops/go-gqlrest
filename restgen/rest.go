@@ -142,7 +142,8 @@ func GetSelection(objects *codegen.Objects, field *codegen.Field, refer bool) st
 			continue
 		}
 
-		referObject := objects.ByName(innerField.Name)
+		innerFieldTypeName := strings.ReplaceAll(innerField.Type.Name(), "!", "")
+		referObject := objects.ByName(innerFieldTypeName)
 		if referObject == nil {
 			innerSelections = append(innerSelections, innerField.Name)
 			continue
