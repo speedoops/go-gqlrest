@@ -28,68 +28,74 @@ func RegisterHandlers(r *chi.Mux, srv http.Handler, prefix string) {
 
 	{{ $root := . }}
 
-	// Query
-	{{ $object := .QueryRoot -}}
-	{{ range $field := $object.Fields -}}
-		{{- $prefix := slice $field.Name 0 2 -}}
-		{{- $internal := eq $prefix "__" -}}
-		{{- if not $internal -}}
-		{ // {{ $field.Name }}
-			{{ $url := getURL $field -}}
-			{{ if $url -}}				
-				{{ $method := getMethod $field "GET" -}}
-				r.Method({{ $method }}, prefix + {{ $url }}, srv)
+	// Part 1/3: Query Objects
+	{
+		{{ $object := .QueryRoot -}}
+		{{ range $field := $object.Fields -}}
+			{{- $prefix := slice $field.Name 0 2 -}}
+			{{- $internal := eq $prefix "__" -}}
+			{{- if not $internal -}}
+			{ // {{ $field.Name }}
+				{{ $url := getURL $field -}}
+				{{ if $url -}}				
+					{{ $method := getMethod $field "GET" -}}
+					r.Method({{ $method }}, prefix + {{ $url }}, srv)
 
-				restOperation[{{ $method }} + ":" + prefix + {{ $url }}] = "{{ $field.Name }}"
-			{{ end -}}
-			{{- $selection := getSelection $root.Objects $field false -}}
-			restSelection["{{ $field.Name }}"] = "{{ $selection }}"
+					restOperation[{{ $method }} + ":" + prefix + {{ $url }}] = "{{ $field.Name }}"
+				{{ end -}}
+				{{- $selection := getSelection $root.Objects $field false -}}
+				restSelection["{{ $field.Name }}"] = "{{ $selection }}"
 
-			methodArguments := make(handlerx.ArgNameArgTypePair)	
-			{{ range $arg := $field.Arguments -}}
-				methodArguments["{{ $arg.Name }}"] = "{{ $arg.Type}}"
+				methodArguments := make(handlerx.ArgNameArgTypePair)	
+				{{ range $arg := $field.Arguments -}}
+					methodArguments["{{ $arg.Name }}"] = "{{ $arg.Type}}"
+				{{ end -}}
+				restArguments["{{ $field.Name }}"] = methodArguments
+			}
 			{{ end -}}
-			restArguments["{{ $field.Name }}"] = methodArguments
-		}
-		{{ end -}}
-	{{ end }}
+		{{ end }}
+	}
 
-	// Mutation
-	{{ $object := .MutationRoot -}}
-	{{ range $field := $object.Fields -}}
-		{{- $prefix := slice $field.Name 0 2 -}}
-		{{- $internal := eq $prefix "__" -}}
-		{{- if not $internal -}}
-		{ // {{ $field.Name }}
-			{{ $url := getURL $field -}}
-			{{ if $url -}}				
-				{{ $method := getMethod $field "POST" -}}
-				r.Method({{ $method }}, prefix + {{ $url }}, srv)
-				
-				restOperation[{{ $method }} + ":" + prefix + {{ $url }}] = "{{ $field.Name }}"
-			{{ end -}}
-			{{- $selection := getSelection $root.Objects $field false -}}
-			restSelection["{{ $field.Name }}"] = "{{ $selection }}"
+	// Part 2/3: Mutation Objects
+	{
+		{{ $object := .MutationRoot -}}
+		{{ range $field := $object.Fields -}}
+			{{- $prefix := slice $field.Name 0 2 -}}
+			{{- $internal := eq $prefix "__" -}}
+			{{- if not $internal -}}
+			{ // {{ $field.Name }}
+				{{ $url := getURL $field -}}
+				{{ if $url -}}				
+					{{ $method := getMethod $field "POST" -}}
+					r.Method({{ $method }}, prefix + {{ $url }}, srv)
+					
+					restOperation[{{ $method }} + ":" + prefix + {{ $url }}] = "{{ $field.Name }}"
+				{{ end -}}
+				{{- $selection := getSelection $root.Objects $field false -}}
+				restSelection["{{ $field.Name }}"] = "{{ $selection }}"
 
-			methodArguments := make(handlerx.ArgNameArgTypePair)	
-			{{ range $arg := $field.Arguments -}}
-				methodArguments["{{ $arg.Name }}"] = "{{ $arg.Type}}"
+				methodArguments := make(handlerx.ArgNameArgTypePair)	
+				{{ range $arg := $field.Arguments -}}
+					methodArguments["{{ $arg.Name }}"] = "{{ $arg.Type}}"
+				{{ end -}}
+				restArguments["{{ $field.Name }}"] = methodArguments
+			}
 			{{ end -}}
-			restArguments["{{ $field.Name }}"] = methodArguments
-		}
-		{{ end -}}
-	{{ end }}
+		{{ end }}
+	}
 
-	// Input
-	{{ range $object := $root.Inputs -}}
-		{ // {{ $object.Name }}
-			inputArguments := make(handlerx.ArgNameArgTypePair)	
-			{{ range $arg := $object.Fields -}}
-				inputArguments["{{ $arg.Name }}"] = "{{ $arg.Type}}"
-			{{ end -}}
-			restInputs["{{ $object.Name }}"] = inputArguments
-		}
-	{{ end }}
+	// Part 3/3: Input Objects
+	{
+		{{ range $object := $root.Inputs -}}
+			{ // {{ $object.Name }}
+				inputArguments := make(handlerx.ArgNameArgTypePair)	
+				{{ range $arg := $object.Fields -}}
+					inputArguments["{{ $arg.Name }}"] = "{{ $arg.Type}}"
+				{{ end -}}
+				restInputs["{{ $object.Name }}"] = inputArguments
+			}
+		{{ end }}
+	}
 
 	handlerx.SetupHTTP2GraphQLMapping(restOperation, restSelection, restArguments, restInputs)
 }
