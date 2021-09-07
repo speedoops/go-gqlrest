@@ -39,13 +39,13 @@ func (m *Plugin) MutateConfig(cfg *config.Config) error {
 
 var debug bool
 
-func DbgPrintln(a ...interface{}) {
+func dbgPrintln(a ...interface{}) {
 	if debug {
 		log.Println(a...)
 	}
 }
 
-func DbgPrintf(format string, a ...interface{}) {
+func dbgPrintf(format string, a ...interface{}) {
 	if debug {
 		log.Printf(format, a...)
 	}
@@ -60,10 +60,10 @@ func DumpObject(objects *codegen.Objects, object *codegen.Object) {
 	// data.QueryRoot.Fields
 	// _ = data.Objects[0].Fields[0].ShortResolverDeclaration()
 	// _ = data.Objects[0].Fields[0].Arguments[0].Name
-	DbgPrintf("\n=> objects: %#v\n", object.Type)
+	dbgPrintf("\n=> objects: %#v\n", object.Type)
 
 	for _, field := range object.Fields {
-		DbgPrintln("=> field:", field.Name, GetSelection(objects, field, false))
+		dbgPrintln("=> field:", field.Name, GetSelection(objects, field, false))
 		// 	fmt.Println("=> field:", field.Object.Name, field.Name, field.FieldDefinition.Directives)
 		// 	if strings.HasPrefix(field.Name, "__") {
 		// 		continue
@@ -108,9 +108,9 @@ func Unused_GetInputs(data *codegen.Data) string {
 
 func GetSelection(objects *codegen.Objects, field *codegen.Field, refer bool) string {
 	if !refer {
-		DbgPrintln("\n+++++++++++++++++++++++++++++++++++++++++")
+		dbgPrintln("\n+++++++++++++++++++++++++++++++++++++++++")
 	}
-	DbgPrintln("=> field:", field.Object.Name, field.Name, field.FieldDefinition.Directives)
+	dbgPrintln("=> field:", field.Object.Name, field.Name, field.FieldDefinition.Directives)
 
 	// 忽略内置字段
 	if strings.HasPrefix(field.Name, "__") {
@@ -120,7 +120,7 @@ func GetSelection(objects *codegen.Objects, field *codegen.Field, refer bool) st
 	// 忽略未选字段
 	directive := field.FieldDefinition.Directives.ForName("hide")
 	if directive != nil {
-		DbgPrintln("field.directive:", directive.Name, ShouldHide(directive))
+		dbgPrintln("field.directive:", directive.Name, ShouldHide(directive))
 	}
 	if ShouldHide(directive) {
 		return ""
@@ -133,10 +133,10 @@ func GetSelection(objects *codegen.Objects, field *codegen.Field, refer bool) st
 
 	innerSelections := make([]string, 0)
 	for _, innerField := range field.TypeReference.Definition.Fields {
-		DbgPrintln("..innerField:", innerField.Name, innerField.Type)
+		dbgPrintln("..innerField:", innerField.Name, innerField.Type)
 		innerDirective := innerField.Directives.ForName("hide")
 		if innerDirective != nil {
-			DbgPrintln("..innerField.directive:", innerDirective.Name, ShouldHide(innerDirective))
+			dbgPrintln("..innerField.directive:", innerDirective.Name, ShouldHide(innerDirective))
 		}
 		if ShouldHide(innerDirective) {
 			continue

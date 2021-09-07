@@ -110,3 +110,20 @@ func writeJSONErrorf(w io.Writer, code ErrorCode, format string, args ...interfa
 		Errors: gqlerror.List{{Message: fmt.Sprintf(format, args...)}},
 	}, false)
 }
+
+type Printer interface {
+	Println(v ...interface{})
+	Printf(format string, v ...interface{})
+}
+
+var _printer Printer
+
+func RegisterPrinter(printer Printer) {
+	_printer = printer
+}
+
+func dbgPrintf(r *http.Request, format string, v ...interface{}) {
+	if _, ok := _printer.(Printer); ok {
+		_printer.Printf(format, v...)
+	}
+}

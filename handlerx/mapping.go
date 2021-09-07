@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strings"
 
@@ -47,8 +46,8 @@ func SetupHTTP2GraphQLMapping(operation RESTOperationMappingType, selection REST
 }
 
 func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams, body []byte) (string, error) {
-	DbgPrintf(r, "ADE: http.POST: %#v", r.URL.Path)
-	DbgPrintf(r, "ADE: http.POST: %#v", r.URL.Query())
+	// DbgPrintf(r, "ADE: http.POST: %#v", r.URL.Path)
+	// DbgPrintf(r, "ADE: http.POST: %#v", r.URL.Query())
 
 	var bodyParams map[string]interface{}
 	if len(body) > 0 {
@@ -132,7 +131,7 @@ func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams
 	// end of query or mutation
 	queryString += " }" // eg. "query { todos(ids:[\"T9527\"],){id,text,done,user{id}} }"
 
-	DbgPrintf(r, "ADE:http.POST: %s", queryString)
+	// DbgPrintf(r, "ADE:http.POST: %s", queryString)
 	params.Query = queryString
 
 	return queryString, nil
@@ -141,7 +140,7 @@ func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams
 func convertFromJSONToGraphQL(r *http.Request, argTypes ArgNameArgTypePair, k string, v interface{}) string {
 	argType, ok := argTypes[k]
 	if !ok {
-		DbgPrintf(r, "formatParam %v %v %v", argTypes, k, v)
+		//dbgPrintf(r, "ignore param %v.%v=%v", argTypes, k, v)
 		return ""
 	}
 	argType = strings.ReplaceAll(argType, "!", "")
@@ -177,12 +176,4 @@ func convertFromJSONToGraphQL(r *http.Request, argTypes ArgNameArgTypePair, k st
 	}
 
 	return paramKV
-}
-
-var debug bool = false
-
-func DbgPrintf(r *http.Request, format string, v ...interface{}) {
-	if debug && len(r.URL.Query()) > 0 {
-		log.Printf(format, v...)
-	}
 }
