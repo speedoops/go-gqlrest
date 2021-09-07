@@ -28,11 +28,11 @@ type (
 
 	// Response is a GraphQL layer response from a handler.
 	Response struct {
-		Code       int
-		Message    string
-		Data       interface{}
-		Errors     json.RawMessage
-		Extensions map[string]interface{}
+		Code    int
+		Message string
+		Data    interface{}
+		//Errors     json.RawMessage
+		//Extensions map[string]interface{}
 	}
 )
 
@@ -67,10 +67,10 @@ func (p *Client) Get(target string, response interface{}, options ...Option) err
 	}
 
 	// we want to unpack even if there is an error, so we can see partial responses
-	unpackErr := unpack(respDataRaw.Data, response)
-	if respDataRaw.Errors != nil {
-		return RawJsonError{respDataRaw.Errors}
-	}
+	unpackErr := unpack(respDataRaw, response)
+	// if respDataRaw.Errors != nil {
+	// 	return RawJsonError{respDataRaw.Errors}
+	// }
 	if respDataRaw.Code != 200 {
 		return fmt.Errorf("code %d: %s", respDataRaw.Code, respDataRaw.Message)
 	}
@@ -97,10 +97,10 @@ func (p *Client) Post(target string, response interface{}, options ...Option) er
 	}
 
 	// we want to unpack even if there is an error, so we can see partial responses
-	unpackErr := unpack(respDataRaw.Data, response)
-	if respDataRaw.Errors != nil {
-		return RawJsonError{respDataRaw.Errors}
-	}
+	unpackErr := unpack(respDataRaw, response)
+	// if respDataRaw.Errors != nil {
+	// 	return RawJsonError{respDataRaw.Errors}
+	// }
 	if respDataRaw.Code != 200 {
 		return fmt.Errorf("code %d: %s", respDataRaw.Code, respDataRaw.Message)
 	}
@@ -127,10 +127,10 @@ func (p *Client) Put(target string, response interface{}, options ...Option) err
 	}
 
 	// we want to unpack even if there is an error, so we can see partial responses
-	unpackErr := unpack(respDataRaw.Data, response)
-	if respDataRaw.Errors != nil {
-		return RawJsonError{respDataRaw.Errors}
-	}
+	unpackErr := unpack(respDataRaw, response)
+	// if respDataRaw.Errors != nil {
+	// 	return RawJsonError{respDataRaw.Errors}
+	// }
 	if respDataRaw.Code != 200 {
 		return fmt.Errorf("code %d: %s", respDataRaw.Code, respDataRaw.Message)
 	}
@@ -157,10 +157,10 @@ func (p *Client) Delete(target string, response interface{}, options ...Option) 
 	}
 
 	// we want to unpack even if there is an error, so we can see partial responses
-	unpackErr := unpack(respDataRaw.Data, response)
-	if respDataRaw.Errors != nil {
-		return RawJsonError{respDataRaw.Errors}
-	}
+	unpackErr := unpack(respDataRaw, response)
+	// if respDataRaw.Errors != nil {
+	// 	return RawJsonError{respDataRaw.Errors}
+	// }
 	if respDataRaw.Code != 200 {
 		return fmt.Errorf("code %d: %s", respDataRaw.Code, respDataRaw.Message)
 	}

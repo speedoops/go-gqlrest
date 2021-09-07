@@ -65,7 +65,7 @@ func RegisterHandlers(r *chi.Mux, srv http.Handler, prefix string) {
 			{{- if not $internal -}}
 			{ // {{ $field.Name }}
 				{{ $url := getURL $field -}}
-				{{ if $url -}}				
+				{{ if $url -}}
 					{{ $method := getMethod $field "POST" -}}
 					r.Method({{ $method }}, prefix + {{ $url }}, srv)
 					
@@ -74,7 +74,7 @@ func RegisterHandlers(r *chi.Mux, srv http.Handler, prefix string) {
 				{{- $selection := getSelection $root.Objects $field false -}}
 				restSelection["{{ $field.Name }}"] = "{{ $selection }}"
 
-				methodArguments := make(handlerx.ArgNameArgTypePair)	
+				methodArguments := make(handlerx.ArgNameArgTypePair)
 				{{ range $arg := $field.Arguments -}}
 					methodArguments["{{ $arg.Name }}"] = "{{ $arg.Type}}"
 				{{ end -}}
