@@ -57,29 +57,15 @@ func writeJSON(w io.Writer, r *graphql.Response, isRESTful bool) {
 	}
 
 	if len(r.Data) > 0 {
-		// a. unmarshal respose data to map
 		var m map[string]json.RawMessage
 		err := json.Unmarshal(r.Data, &m)
 		if err != nil {
 			panic(err)
 		}
 
-		// b. get first key-value pair of the map
-		var k string
-		var v json.RawMessage
-		for k, v = range m {
-			break // it's ok to break here, because graphql response data will have only one top struct member
-		}
-
-		// c. mapping or squashing
-		if len(v) > 0 && v[0] == '[' {
-			// if it is a slice, change member name to 'list'
-			delete(m, k)
-			m["results"] = v
-			response.Data, _ = json.Marshal(m)
-		} else {
-			// else, set data to it's first child
+		for _, v := range m {
 			response.Data = v
+			break // it's ok to break here, because graphql response data will have only one top struct member
 		}
 	}
 
