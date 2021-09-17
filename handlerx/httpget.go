@@ -1,6 +1,8 @@
 package handlerx
 
 import (
+	"bytes"
+	"io/ioutil"
 	"net/http"
 	"strings"
 
@@ -24,6 +26,10 @@ func (h GET) Supports(r *http.Request) bool {
 
 func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecutor) {
 	w.Header().Set("Content-Type", "application/json")
+
+	// https://stackoverflow.com/questions/43021058/golang-read-request-body-multiple-times
+	body, _ := ioutil.ReadAll(r.Body)
+	r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
 
 	params := &graphql.RawParams{
 		Query:         r.URL.Query().Get("query"),
@@ -49,10 +55,10 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	isRESTful := false
-	if params.Query == "" { // This is a RESTful request, convert it to GraphQL query
+	if params.Query == "" { // For RESTful request, convert to GraphQL query
 		isRESTful = true
 
-		queryString, err := convertHTTPRequestToGraphQLQuery(r, params, nil)
+		queryString, err := convertHTTPRequestToGraphQLQuery(r, params, body)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			writeJSONErrorf(w, ErrDecodeJson, "json body could not be decoded: "+err.Error())

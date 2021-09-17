@@ -51,8 +51,8 @@ func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams
 
 	var bodyParams map[string]interface{}
 	if len(body) > 0 {
-		r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
-		if err := jsonDecode(r.Body, &bodyParams); err != nil {
+		bodyReader := ioutil.NopCloser(bytes.NewBuffer(body))
+		if err := jsonDecode(bodyReader, &bodyParams); err != nil {
 			return "", err
 		}
 	} else {

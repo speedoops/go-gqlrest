@@ -30,21 +30,26 @@ func (h POST) Supports(r *http.Request) bool {
 func (h POST) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecutor) {
 	w.Header().Set("Content-Type", "application/json")
 
-	body, _ := ioutil.ReadAll(r.Body)
 	// https://stackoverflow.com/questions/43021058/golang-read-request-body-multiple-times
+	body, _ := ioutil.ReadAll(r.Body)
 	r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
 
 	var params *graphql.RawParams
 	start := graphql.Now()
-	if err := jsonDecode(r.Body, &params); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		writeJSONErrorf(w, ErrDecodeJson, "json body could not be decoded: "+err.Error())
-		return
+	if len(body) == 0 { // For RESTful request, body may be null
+		params = new(graphql.RawParams)
+	} else {
+		bodyReader := ioutil.NopCloser(bytes.NewBuffer(body))
+		if err := jsonDecode(bodyReader, &params); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			writeJSONErrorf(w, ErrDecodeJson, "json body could not be decoded: "+err.Error())
+			return
+		}
 	}
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	isRESTful := false
-	if params.Query == "" { // This is a RESTful request, convert it to GraphQL query
+	if params.Query == "" { // For RESTful request, convert to GraphQL query
 		isRESTful = true
 
 		queryString, err := convertHTTPRequestToGraphQLQuery(r, params, body)
