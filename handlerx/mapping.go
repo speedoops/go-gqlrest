@@ -81,8 +81,10 @@ func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams
 		inputParams := make(map[string]interface{})
 		// 2.1 Query Parameters (GET/POST/PUT/DELETE)
 		for k, v := range r.URL.Query() {
-			inputParams[k] = v[0] // only accecpt one value for each key
-			queryParams[k] = v[0] // key=[v1,v2,v3] works
+			// convert "k=v1&k=v2&k=v3" to "k=v1,v2,v3"
+			val := strings.Join(v, ",")
+			inputParams[k] = val
+			queryParams[k] = val
 		}
 		// 2.2 Path Parameters (GET/POST/PUT/DELETE)
 		for i, k := range rctx.URLParams.Keys {
@@ -145,14 +147,16 @@ func convertFromJSONToGraphQL(r *http.Request, argTypes ArgNameArgTypePair, k st
 		return ""
 	}
 	argType = strings.ReplaceAll(argType, "!", "")
+	DbgPrintf(r, "%s %s = %v", argType, k, v)
 
 	var paramKV string
 	switch argType {
-	case "Boolean", "Int":
+	case "Boolean", "Int", "Float":
 		paramKV = fmt.Sprintf(`%s:%v`, k, v)
-	case "[Int]":
+	case "[Boolean]", "[Int]", "[Float]":
 		paramKV = fmt.Sprintf(`%s:[%v]`, k, v)
 	case "[ID]", "[String]":
+		v = strings.ReplaceAll(v.(string), ",", `","`)
 		paramKV = fmt.Sprintf(`%s:["%v"]`, k, v)
 	default:
 		if strings.HasSuffix(argType, "Input") {
@@ -179,7 +183,7 @@ func convertFromJSONToGraphQL(r *http.Request, argTypes ArgNameArgTypePair, k st
 	return paramKV
 }
 
-var debug bool = false
+var debug bool = true
 
 func DbgPrintf(r *http.Request, format string, v ...interface{}) {
 	if debug && len(r.URL.Query()) > 0 {
