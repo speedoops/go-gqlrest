@@ -23,15 +23,7 @@ type RESTSelectionMappingType map[string]string
 type RESTArgumentsMappingType map[string]ArgNameArgTypePair
 type ArgNameArgTypePair map[string]string
 
-// 2. Global Error Codes
-type ErrorCode int
-
-const (
-	ErrDecodeJson   = 422
-	ErrInvalidParam = 400
-)
-
-// local variables
+// 2. Local variables
 var restOperation RESTOperationMappingType
 var restSelection RESTSelectionMappingType
 var restArguments RESTArgumentsMappingType
@@ -80,8 +72,10 @@ func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams
 		inputParams := make(map[string]interface{})
 		// 2.1 Query Parameters (GET/POST/PUT/DELETE)
 		for k, v := range r.URL.Query() {
-			inputParams[k] = v[0] // only accecpt one value for each key
-			queryParams[k] = v[0] // key=[v1,v2,v3] works
+			// convert "k=v1&k=v2&k=v3" to "k=v1,v2,v3"
+			val := strings.Join(v, ",")
+			inputParams[k] = val
+			queryParams[k] = val
 		}
 		// 2.2 Path Parameters (GET/POST/PUT/DELETE)
 		for i, k := range rctx.URLParams.Keys {
@@ -145,15 +139,17 @@ func convertFromJSONToGraphQL(r *http.Request, argTypes ArgNameArgTypePair, k st
 		return ""
 	}
 	argType = strings.ReplaceAll(argType, "!", "")
+	// dbgPrintf(r, "arg: %s %s = %v", argType, k, v)
 
 	var paramKV string
 	switch argType {
-	case "Boolean", "Int":
-		paramKV = fmt.Sprintf(`%s:%v`, k, v)
-	case "[Int]":
-		paramKV = fmt.Sprintf(`%s:[%v]`, k, v)
+	case "Boolean", "Int", "Float":
+		paramKV = fmt.Sprintf(`%s:%s`, k, v)
+	case "[Boolean]", "[Int]", "[Float]":
+		paramKV = fmt.Sprintf(`%s:[%s]`, k, v)
 	case "[ID]", "[String]":
-		paramKV = fmt.Sprintf(`%s:["%v"]`, k, v)
+		v = strings.ReplaceAll(v.(string), ",", `","`)
+		paramKV = fmt.Sprintf(`%s:["%s"]`, k, v)
 	default:
 		if strings.HasSuffix(argType, "Input") {
 			queryParamsString := make([]string, 0)

@@ -40,7 +40,7 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 	if variables := r.URL.Query().Get("variables"); variables != "" {
 		if err := jsonDecode(strings.NewReader(variables), &params.Variables); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			writeJSONError(w, ErrDecodeJson, "variables could not be decoded")
+			writeJSONError(w, http.StatusUnprocessableEntity, "variables could not be decoded")
 			return
 		}
 	}
@@ -48,7 +48,7 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 	if extensions := r.URL.Query().Get("extensions"); extensions != "" {
 		if err := jsonDecode(strings.NewReader(extensions), &params.Extensions); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			writeJSONError(w, ErrDecodeJson, "extensions could not be decoded")
+			writeJSONError(w, http.StatusUnprocessableEntity, "extensions could not be decoded")
 			return
 		}
 	}
@@ -61,7 +61,7 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 		queryString, err := convertHTTPRequestToGraphQLQuery(r, params, body)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			writeJSONErrorf(w, ErrDecodeJson, "json body could not be decoded: "+err.Error())
+			writeJSONErrorf(w, http.StatusUnprocessableEntity, "json body could not be decoded: "+err.Error())
 			return
 		}
 		params.Query = queryString
@@ -83,7 +83,7 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 	op := rc.Doc.Operations.ForName(rc.OperationName)
 	if op.Operation != ast.Query {
 		w.WriteHeader(http.StatusNotAcceptable)
-		writeJSONError(w, ErrInvalidParam, "GET requests only allow query operations")
+		writeJSONError(w, http.StatusBadRequest, "GET requests only allow query operations")
 		return
 	}
 

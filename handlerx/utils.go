@@ -52,7 +52,7 @@ func writeJSON(w io.Writer, r *graphql.Response, isRESTful bool) {
 
 	// 2. For RESTful API
 	response := &RESTResponse{
-		Code: 200,
+		Code: http.StatusOK,
 		Data: r.Data,
 	}
 
@@ -70,12 +70,12 @@ func writeJSON(w io.Writer, r *graphql.Response, isRESTful bool) {
 	}
 
 	if len(r.Errors) > 0 {
-		code, msgs := "500", []string{}
+		code, msgs := strconv.Itoa(http.StatusUnprocessableEntity), []string{}
 		for _, e := range r.Errors {
 			if n, ok := e.Extensions["code"]; ok {
 				code, _ = n.(string)
 			}
-			msgs = append(msgs, e.Message)
+			msgs = append(msgs, e.Path.String()+": "+e.Message)
 		}
 
 		response.Code, _ = strconv.Atoi(code)
@@ -93,7 +93,7 @@ func writeJSON(w io.Writer, r *graphql.Response, isRESTful bool) {
 	}
 }
 
-func writeJSONError(w io.Writer, code ErrorCode, msg string) {
+func writeJSONError(w io.Writer, code int, msg string) {
 	writeJSON(w, &graphql.Response{
 		Extensions: map[string]interface{}{
 			"code": code,
@@ -102,7 +102,7 @@ func writeJSONError(w io.Writer, code ErrorCode, msg string) {
 	}, false)
 }
 
-func writeJSONErrorf(w io.Writer, code ErrorCode, format string, args ...interface{}) {
+func writeJSONErrorf(w io.Writer, code int, format string, args ...interface{}) {
 	writeJSON(w, &graphql.Response{
 		Extensions: map[string]interface{}{
 			"code": code,

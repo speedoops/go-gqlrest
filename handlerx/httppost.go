@@ -42,7 +42,7 @@ func (h POST) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecu
 		bodyReader := ioutil.NopCloser(bytes.NewBuffer(body))
 		if err := jsonDecode(bodyReader, &params); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			writeJSONErrorf(w, ErrDecodeJson, "json body could not be decoded: "+err.Error())
+			writeJSONErrorf(w, http.StatusUnprocessableEntity, "json body could not be decoded: "+err.Error())
 			return
 		}
 	}
@@ -55,7 +55,7 @@ func (h POST) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecu
 		queryString, err := convertHTTPRequestToGraphQLQuery(r, params, body)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			writeJSONErrorf(w, ErrDecodeJson, "query body could not be parsed: "+err.Error())
+			writeJSONErrorf(w, http.StatusUnprocessableEntity, "query body could not be parsed: "+err.Error())
 			return
 		}
 		params.Query = queryString

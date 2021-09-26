@@ -36,7 +36,7 @@ func (h DELETE) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExe
 		queryString, err := convertHTTPRequestToGraphQLQuery(r, params, body)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			writeJSONErrorf(w, ErrDecodeJson, "query body could not be parsed: "+err.Error())
+			writeJSONErrorf(w, http.StatusUnprocessableEntity, "query body could not be parsed: "+err.Error())
 			return
 		}
 		params.Query = queryString
