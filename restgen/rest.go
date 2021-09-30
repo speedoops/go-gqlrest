@@ -173,11 +173,6 @@ func ShouldHide(directive *ast.Directive) bool {
 	}
 
 	forName := directive.Arguments.ForName("for")
-	// forValue := forName.Value.String()
-	// if strings.Contains(forValue, `"rest"`) {
-	// 	fmt.Println("YES")
-	// }
-
 	for _, v := range forName.Value.Children {
 		// DbgPrintln("~tags:", v.Name, v.Value)
 		if v.Value.Raw == "rest" {
@@ -207,7 +202,7 @@ func GetMethod(field *codegen.Field, defaultMethod string) string {
 	}
 
 	methodName := directive.Arguments.ForName("method")
-	methodValue := fmt.Sprintf(`"%s"`, defaultMethod)
+	methodValue := fmt.Sprintf("%q", defaultMethod)
 	if methodName != nil {
 		methodValue = methodName.Value.String()
 	}

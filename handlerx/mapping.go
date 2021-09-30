@@ -177,7 +177,7 @@ func convertFromJSONToGraphQL(r *http.Request, argTypes ArgNameArgTypePair, k st
 		vars := getSliceInterface(v)
 		var vals []string
 		for _, vv := range vars {
-			tmp := fmt.Sprintf(`"%v"`, vv)
+			tmp := fmt.Sprintf("%q", vv)
 			vals = append(vals, tmp)
 		}
 		paramKV = fmt.Sprintf(`%s:[%s]`, k, strings.Join(vals, ","))
