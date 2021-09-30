@@ -132,6 +132,26 @@ func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams
 	return queryString, nil
 }
 
+func getMapStringInterface(v_ interface{}) map[string]interface{} {
+	if v_ == nil {
+		return make(map[string]interface{})
+	}
+	if v, ok := v_.(map[string]interface{}); ok {
+		return v
+	}
+	return make(map[string]interface{})
+}
+
+func getSliceInterface(v_ interface{}) []interface{} {
+	if v_ == nil {
+		return []interface{}{}
+	}
+	if v, ok := v_.([]interface{}); ok {
+		return v
+	}
+	return []interface{}{}
+}
+
 func convertFromJSONToGraphQL(r *http.Request, argTypes ArgNameArgTypePair, k string, v interface{}) string {
 	argType, ok := argTypes[k]
 	if !ok {
@@ -144,12 +164,23 @@ func convertFromJSONToGraphQL(r *http.Request, argTypes ArgNameArgTypePair, k st
 	var paramKV string
 	switch argType {
 	case "Boolean", "Int", "Float":
-		paramKV = fmt.Sprintf(`%s:%s`, k, v)
+		paramKV = fmt.Sprintf(`%s:%v`, k, v)
 	case "[Boolean]", "[Int]", "[Float]":
-		paramKV = fmt.Sprintf(`%s:[%s]`, k, v)
+		vars := getSliceInterface(v)
+		var vals []string
+		for _, vv := range vars {
+			tmp := fmt.Sprintf("%v", vv)
+			vals = append(vals, tmp)
+		}
+		paramKV = fmt.Sprintf(`%s:[%s]`, k, strings.Join(vals, ","))
 	case "[ID]", "[String]":
-		v = strings.ReplaceAll(v.(string), ",", `","`)
-		paramKV = fmt.Sprintf(`%s:["%s"]`, k, v)
+		vars := getSliceInterface(v)
+		var vals []string
+		for _, vv := range vars {
+			tmp := fmt.Sprintf(`"%v"`, vv)
+			vals = append(vals, tmp)
+		}
+		paramKV = fmt.Sprintf(`%s:[%s]`, k, strings.Join(vals, ","))
 	default:
 		if strings.HasSuffix(argType, "Input") {
 			queryParamsString := make([]string, 0)
@@ -163,7 +194,7 @@ func convertFromJSONToGraphQL(r *http.Request, argTypes ArgNameArgTypePair, k st
 			}
 			if len(queryParamsString) > 0 {
 				queryParamsStringX := strings.Join(queryParamsString, ",")
-				paramKV = fmt.Sprintf(`%s:{%v}`, k, queryParamsStringX)
+				paramKV = fmt.Sprintf(`%s:{%s}`, k, queryParamsStringX)
 			}
 		} else if strings.HasSuffix(argType, "Type") {
 			paramKV = fmt.Sprintf(`%s:%v`, k, v)

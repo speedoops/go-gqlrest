@@ -75,7 +75,11 @@ func writeJSON(w io.Writer, r *graphql.Response, isRESTful bool) {
 			if n, ok := e.Extensions["code"]; ok {
 				code, _ = n.(string)
 			}
-			msgs = append(msgs, e.Path.String()+": "+e.Message)
+			if len(e.Path) > 0 {
+				msgs = append(msgs, e.Message+" "+e.Path.String())
+			} else {
+				msgs = append(msgs, e.Message)
+			}
 		}
 
 		response.Code, _ = strconv.Atoi(code)
