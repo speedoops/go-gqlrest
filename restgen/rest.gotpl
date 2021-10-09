@@ -30,6 +30,8 @@ func RegisterHandlers(r *chi.Mux, srv http.Handler, prefix string) {
 
 	{{ $root := . }}
 
+	// Statistics: Queries={{ .QueryRoot.Fields | len }} Mutations={{ .MutationRoot.Fields | len }} Inputs={{ .Inputs | len }} 
+
 	// Part 1/3: Query Objects
 	{
 		{{ $object := .QueryRoot -}}
