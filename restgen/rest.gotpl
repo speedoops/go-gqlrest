@@ -19,20 +19,22 @@
 {{ reserveImport "github.com/speedoops/go-gqlrest/handlerx" }}
 
 func RegisterHandlers(r *chi.Mux, srv http.Handler, prefix string) {
-	// REST URL => GraphQL Operation
-	restOperation := make(handlerx.RESTOperationMappingType)
-	// GraphQL Operation => Fields Selection
-	restSelection := make(handlerx.RESTSelectionMappingType)
-	// GraphQL Operation => Arguments <Name,Type>
-	restArguments := make(handlerx.RESTArgumentsMappingType)
-	// GraphQL Operation => Arguments <Name,Type>
-	restInputs := make(handlerx.RESTArgumentsMappingType)
+	// Mapping from `URL` to `GraphQL Operation`
+	restOperation := make(handlerx.StringMap)
+	// Mapping from `GraphQL Operation` to `Fields Selection`
+	restSelection := make(handlerx.StringMap)
+	// Mapping from `GraphQL Operation` to `Arguments <Name,Type>`
+	restArguments := make(handlerx.ArgTypeMap)
+	// Mapping from `GraphQL Operation` to `InputType <Name,Type>`
+	restInputs := make(handlerx.ArgTypeMap)
+	// Mapping from `Name` to `TypeKind`
+	restTypes := make(handlerx.StringMap)
 
 	{{ $root := . }}
 
-	// Statistics: Queries={{ .QueryRoot.Fields | len }} Mutations={{ .MutationRoot.Fields | len }} Inputs={{ .Inputs | len }} 
+	// Statistics: Queries={{ .QueryRoot.Fields | len }}, Mutations={{ .MutationRoot.Fields | len }}, Enums={{ .Schema.Types | len }}, Inputs={{ .Inputs | len }} 
 
-	// Part 1/3: Query Objects
+	// Part 1/4: Query Objects
 	{
 		{{ $object := .QueryRoot -}}
 		{{ range $field := $object.Fields -}}
@@ -50,7 +52,7 @@ func RegisterHandlers(r *chi.Mux, srv http.Handler, prefix string) {
 				{{- $selection := getSelection $root.Objects $field false -}}
 				restSelection["{{ $field.Name }}"] = "{{ $selection }}"
 
-				methodArguments := make(handlerx.ArgNameArgTypePair)	
+				methodArguments := make(handlerx.StringMap)	
 				{{ range $arg := $field.Arguments -}}
 					methodArguments["{{ $arg.Name }}"] = "{{ $arg.Type}}"
 				{{ end -}}
@@ -60,7 +62,7 @@ func RegisterHandlers(r *chi.Mux, srv http.Handler, prefix string) {
 		{{ end }}
 	}
 
-	// Part 2/3: Mutation Objects
+	// Part 2/4: Mutation Objects
 	{
 		{{ $object := .MutationRoot -}}
 		{{ range $field := $object.Fields -}}
@@ -78,7 +80,7 @@ func RegisterHandlers(r *chi.Mux, srv http.Handler, prefix string) {
 				{{- $selection := getSelection $root.Objects $field false -}}
 				restSelection["{{ $field.Name }}"] = "{{ $selection }}"
 
-				methodArguments := make(handlerx.ArgNameArgTypePair)
+				methodArguments := make(handlerx.StringMap)
 				{{ range $arg := $field.Arguments -}}
 					methodArguments["{{ $arg.Name }}"] = "{{ $arg.Type}}"
 				{{ end -}}
@@ -88,11 +90,20 @@ func RegisterHandlers(r *chi.Mux, srv http.Handler, prefix string) {
 		{{ end }}
 	}
 
-	// Part 3/3: Input Objects
+	// Part 3/4: User Defined Types
+	{
+		{{ range $name, $type := $root.Schema.Types -}}		
+			{{ if not $type.BuiltIn -}}
+				restTypes["{{ $name }}"] = "{{$type.Kind}}"
+			{{ end -}}
+		{{ end -}}
+	}
+
+	// Part 4/4: Input Objects
 	{
 		{{ range $object := $root.Inputs -}}
 			{ // {{ $object.Name }}
-				inputArguments := make(handlerx.ArgNameArgTypePair)	
+				inputArguments := make(handlerx.StringMap)	
 				{{ range $arg := $object.Fields -}}
 					inputArguments["{{ $arg.Name }}"] = "{{ $arg.Type}}"
 				{{ end -}}

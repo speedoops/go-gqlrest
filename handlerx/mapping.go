@@ -13,28 +13,26 @@ import (
 )
 
 // 1. Global Declaration
-// REST URL => GraphQL Operation
-type RESTOperationMappingType map[string]string
-
-// GraphQL Operation => Fields Selection
-type RESTSelectionMappingType map[string]string
-
-// GraphQL Operation => Operation Arguments Pair of <ArgName,ArgType>
-type RESTArgumentsMappingType map[string]ArgNameArgTypePair
-type ArgNameArgTypePair map[string]string
+type StringMap map[string]string
+type ArgTypeMap map[string]StringMap
 
 // 2. Local variables
-var restOperation RESTOperationMappingType
-var restSelection RESTSelectionMappingType
-var restArguments RESTArgumentsMappingType
-var restArgInputs RESTArgumentsMappingType
+// REST URL => GraphQL Operation
+var restURL2Operation StringMap
 
-func SetupHTTP2GraphQLMapping(operation RESTOperationMappingType, selection RESTSelectionMappingType,
-	arguments RESTArgumentsMappingType, argInputs RESTArgumentsMappingType) {
-	restOperation = operation
-	restSelection = selection
-	restArguments = arguments
-	restArgInputs = argInputs
+// GraphQL Operation => Fields Selection
+var restOperation2Selection StringMap
+
+// GraphQL Operation => Operation Arguments Pair of <ArgName,ArgType>
+var restOperation2Arguments ArgTypeMap
+var restOperation2ArgInputs ArgTypeMap
+
+func SetupHTTP2GraphQLMapping(operation StringMap, selection StringMap,
+	arguments ArgTypeMap, argInputs ArgTypeMap) {
+	restURL2Operation = operation
+	restOperation2Selection = selection
+	restOperation2Arguments = arguments
+	restOperation2ArgInputs = argInputs
 }
 
 func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams, body []byte) (string, error) {
@@ -59,7 +57,7 @@ func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams
 	// 1. Operation Name
 	rctx := chi.RouteContext(r.Context())
 	routePattern := rctx.RoutePattern()
-	operationName, ok := restOperation[r.Method+":"+routePattern]
+	operationName, ok := restURL2Operation[r.Method+":"+routePattern]
 	if !ok {
 		err := errors.New("unknown operation: " + rctx.RoutePattern())
 		return "", err
@@ -67,7 +65,7 @@ func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams
 	queryString += operationName // eg. "query { todos"
 
 	// 2. Query Parameters
-	if argTypes, ok := restArguments[operationName]; ok {
+	if argTypes, ok := restOperation2Arguments[operationName]; ok {
 		queryParams := make(map[string]interface{})
 		inputParams := make(map[string]interface{})
 		// 2.1 Query Parameters (GET/POST/PUT/DELETE)
@@ -116,7 +114,7 @@ func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams
 	}
 
 	// 3. Field Selection
-	selection, ok := restSelection[operationName]
+	selection, ok := restOperation2Selection[operationName]
 	if !ok {
 		err := errors.New("FIXME: OOPS! no match selection. " + rctx.RoutePattern())
 		return "", err
@@ -143,16 +141,24 @@ func getMapStringInterface(v_ interface{}) map[string]interface{} {
 }
 
 func getSliceInterface(v_ interface{}) []interface{} {
+	ret := []interface{}{}
 	if v_ == nil {
-		return []interface{}{}
+		return ret
 	}
 	if v, ok := v_.([]interface{}); ok {
 		return v
 	}
-	return []interface{}{}
+	if v, ok := v_.(string); ok {
+		s := strings.Split(v, ",")
+		for _, sv := range s {
+			ret = append(ret, sv)
+		}
+		return ret
+	}
+	panic("mapping: unknown interface type")
 }
 
-func convertFromJSONToGraphQL(r *http.Request, argTypes ArgNameArgTypePair, k string, v interface{}) string {
+func convertFromJSONToGraphQL(r *http.Request, argTypes StringMap, k string, v interface{}) string {
 	argType, ok := argTypes[k]
 	if !ok {
 		//dbgPrintf(r, "ignore param %v.%v=%v", argTypes, k, v)
@@ -186,7 +192,7 @@ func convertFromJSONToGraphQL(r *http.Request, argTypes ArgNameArgTypePair, k st
 			queryParamsString := make([]string, 0)
 			queryParams, _ := v.(map[string]interface{})
 			for k, v := range queryParams {
-				if inputTypes, ok := restArgInputs[argType]; ok {
+				if inputTypes, ok := restOperation2ArgInputs[argType]; ok {
 					if paramKV := convertFromJSONToGraphQL(r, inputTypes, k, v); paramKV != "" {
 						queryParamsString = append(queryParamsString, paramKV)
 					}
