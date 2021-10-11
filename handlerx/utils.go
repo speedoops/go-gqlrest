@@ -126,7 +126,7 @@ func RegisterPrinter(printer Printer) {
 	_printer = printer
 }
 
-func dbgPrintf(r *http.Request, format string, v ...interface{}) {
+func dbgPrintf(format string, v ...interface{}) {
 	if _, ok := _printer.(Printer); ok {
 		_printer.Printf(format, v...)
 	}

@@ -18,21 +18,25 @@ type ArgTypeMap map[string]StringMap
 
 // 2. Local variables
 // REST URL => GraphQL Operation
-var restURL2Operation StringMap
+var restURL2GraphOperation StringMap
 
 // GraphQL Operation => Fields Selection
-var restOperation2Selection StringMap
+var graphOperation2RESTSelection StringMap
 
 // GraphQL Operation => Operation Arguments Pair of <ArgName,ArgType>
 var restOperation2Arguments ArgTypeMap
-var restOperation2ArgInputs ArgTypeMap
+var inputType2FieldDefinitions ArgTypeMap
 
-func SetupHTTP2GraphQLMapping(operation StringMap, selection StringMap,
-	arguments ArgTypeMap, argInputs ArgTypeMap) {
-	restURL2Operation = operation
-	restOperation2Selection = selection
+// Type Name => Type Kind
+var typeName2TypeKinds StringMap
+
+func SetupHTTP2GraphQLMapping(operations StringMap, selections StringMap,
+	arguments ArgTypeMap, inputTypes ArgTypeMap, typeKinds StringMap) {
+	restURL2GraphOperation = operations
+	graphOperation2RESTSelection = selections
 	restOperation2Arguments = arguments
-	restOperation2ArgInputs = argInputs
+	inputType2FieldDefinitions = inputTypes
+	typeName2TypeKinds = typeKinds
 }
 
 func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams, body []byte) (string, error) {
@@ -57,7 +61,7 @@ func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams
 	// 1. Operation Name
 	rctx := chi.RouteContext(r.Context())
 	routePattern := rctx.RoutePattern()
-	operationName, ok := restURL2Operation[r.Method+":"+routePattern]
+	operationName, ok := restURL2GraphOperation[r.Method+":"+routePattern]
 	if !ok {
 		err := errors.New("unknown operation: " + rctx.RoutePattern())
 		return "", err
@@ -114,7 +118,7 @@ func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams
 	}
 
 	// 3. Field Selection
-	selection, ok := restOperation2Selection[operationName]
+	selection, ok := graphOperation2RESTSelection[operationName]
 	if !ok {
 		err := errors.New("FIXME: OOPS! no match selection. " + rctx.RoutePattern())
 		return "", err
@@ -130,32 +134,32 @@ func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams
 	return queryString, nil
 }
 
-func getMapStringInterface(v_ interface{}) map[string]interface{} {
-	if v_ == nil {
+func getMapStringInterface(v interface{}) map[string]interface{} {
+	if v == nil {
 		return make(map[string]interface{})
 	}
-	if v, ok := v_.(map[string]interface{}); ok {
-		return v
+	if vm, ok := v.(map[string]interface{}); ok {
+		return vm
 	}
 	return make(map[string]interface{})
 }
 
-func getSliceInterface(v_ interface{}) []interface{} {
+func getSliceInterface(v interface{}) []interface{} {
 	ret := []interface{}{}
-	if v_ == nil {
+	if v == nil {
 		return ret
 	}
-	if v, ok := v_.([]interface{}); ok {
-		return v
+	if vs, ok := v.([]interface{}); ok {
+		return vs
 	}
-	if v, ok := v_.(string); ok {
-		s := strings.Split(v, ",")
-		for _, sv := range s {
-			ret = append(ret, sv)
+	if vs, ok := v.(string); ok {
+		ss := strings.Split(vs, ",")
+		for _, ssv := range ss {
+			ret = append(ret, ssv)
 		}
 		return ret
 	}
-	panic("mapping: unknown interface type")
+	panic(fmt.Sprintf("mapping: unknown interface type %#v", v))
 }
 
 func convertFromJSONToGraphQL(r *http.Request, argTypes StringMap, k string, v interface{}) string {
@@ -188,24 +192,29 @@ func convertFromJSONToGraphQL(r *http.Request, argTypes StringMap, k string, v i
 		}
 		paramKV = fmt.Sprintf(`%s:[%s]`, k, strings.Join(vals, ","))
 	default:
-		if strings.HasSuffix(argType, "Input") {
-			queryParamsString := make([]string, 0)
-			queryParams, _ := v.(map[string]interface{})
-			for k, v := range queryParams {
-				if inputTypes, ok := restOperation2ArgInputs[argType]; ok {
-					if paramKV := convertFromJSONToGraphQL(r, inputTypes, k, v); paramKV != "" {
-						queryParamsString = append(queryParamsString, paramKV)
+		if typeKind, ok := typeName2TypeKinds[argType]; ok {
+			if typeKind == "ENUM" {
+				paramKV = fmt.Sprintf(`%s:%v`, k, v)
+			} else if typeKind == "INPUT_OBJECT" {
+				if inputTypes, ok := inputType2FieldDefinitions[argType]; ok {
+					queryParamsString := make([]string, 0)
+					queryParams, _ := v.(map[string]interface{})
+					for k, v := range queryParams {
+						if paramKV := convertFromJSONToGraphQL(r, inputTypes, k, v); paramKV != "" {
+							queryParamsString = append(queryParamsString, paramKV)
+						}
 					}
+					if len(queryParamsString) > 0 {
+						queryParamsStringX := strings.Join(queryParamsString, ",")
+						paramKV = fmt.Sprintf(`%s:{%s}`, k, queryParamsStringX)
+					}
+				} else {
+					panic(fmt.Sprintf("mapping: unknown input type %#v", v))
 				}
 			}
-			if len(queryParamsString) > 0 {
-				queryParamsStringX := strings.Join(queryParamsString, ",")
-				paramKV = fmt.Sprintf(`%s:{%s}`, k, queryParamsStringX)
-			}
-		} else if strings.HasSuffix(argType, "Type") {
-			paramKV = fmt.Sprintf(`%s:%v`, k, v)
 		} else {
 			paramKV = fmt.Sprintf(`%s:"%v"`, k, v)
+			dbgPrintf("mapping: unknown argument type %#v", v)
 		}
 	}
 

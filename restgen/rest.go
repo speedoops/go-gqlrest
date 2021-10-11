@@ -210,7 +210,24 @@ func GetMethod(field *codegen.Field, defaultMethod string) string {
 	return methodValue
 }
 
+func StaticCheck(data *codegen.Data) {
+	for _, object := range data.Inputs {
+		if !strings.HasSuffix(object.Name, "Input") {
+			log.Printf("WARNING: input type '%s' shoud be named with suffix 'Input'.\n", object.Name)
+		}
+	}
+
+	for _, object := range data.Schema.Types {
+		if !object.BuiltIn && object.Kind == "ENUM" {
+			if !strings.HasSuffix(object.Name, "Type") && !strings.HasSuffix(object.Name, "State") && !strings.HasSuffix(object.Name, "Status") {
+				log.Printf("WARNING: enum type '%s' shoud be named with suffix 'Type|State|Status'.\n", object.Name)
+			}
+		}
+	}
+}
+
 func (m *Plugin) GenerateCode(data *codegen.Data) error {
+	StaticCheck(data)
 	DumpObject(&data.Objects, data.Objects.ByName("query"))
 
 	abs, err := filepath.Abs(m.filename)

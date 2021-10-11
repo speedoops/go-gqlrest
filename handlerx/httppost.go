@@ -76,7 +76,7 @@ func (h POST) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecu
 	}
 
 	if rc.Operation.Name != "IntrospectionQuery" {
-		dbgPrintf(r, "HTTP %s %s: %s %s", r.Method, r.URL.Path, params.Query, params.Variables)
+		dbgPrintf("HTTP %s %s: %s %s", r.Method, r.URL.Path, params.Query, params.Variables)
 	}
 
 	ctx := graphql.WithOperationContext(r.Context(), rc)

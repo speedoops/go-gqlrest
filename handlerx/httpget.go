@@ -70,7 +70,7 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 
 	params.ReadTime.End = graphql.Now()
 
-	dbgPrintf(r, "HTTP %s %s: %s %s", r.Method, r.URL.Path, params.Query, params.Variables)
+	dbgPrintf("HTTP %s %s: %s %s", r.Method, r.URL.Path, params.Query, params.Variables)
 
 	rc, err := exec.CreateOperationContext(r.Context(), params)
 	if err != nil {

@@ -112,6 +112,6 @@ func RegisterHandlers(r *chi.Mux, srv http.Handler, prefix string) {
 		{{ end }}
 	}
 
-	handlerx.SetupHTTP2GraphQLMapping(restOperation, restSelection, restArguments, restInputs)
+	handlerx.SetupHTTP2GraphQLMapping(restOperation, restSelection, restArguments, restInputs, restTypes)
 }
 
