@@ -159,7 +159,7 @@ func getSliceInterface(v interface{}) []interface{} {
 		}
 		return ret
 	}
-	panic(fmt.Sprintf("mapping: unknown interface type %#v", v))
+	panic(fmt.Sprintf("mapping: unknown slice interface type %#v", v))
 }
 
 func convertFromJSONToGraphQL(r *http.Request, argTypes StringMap, k string, v interface{}) string {
