@@ -36,6 +36,8 @@ type (
 	}
 )
 
+const OK = 0
+
 // New creates a graphql client
 // Options can be set that should be applied to all requests made with this client
 func New(h http.Handler, opts ...Option) *Client {
@@ -71,7 +73,7 @@ func (p *Client) Get(target string, response interface{}, options ...Option) err
 	// if respDataRaw.Errors != nil {
 	// 	return RawJsonError{respDataRaw.Errors}
 	// }
-	if respDataRaw.Code != 200 {
+	if respDataRaw.Code != OK {
 		return fmt.Errorf("code %d: %s", respDataRaw.Code, respDataRaw.Message)
 	}
 	return unpackErr
@@ -101,7 +103,7 @@ func (p *Client) Post(target string, response interface{}, options ...Option) er
 	// if respDataRaw.Errors != nil {
 	// 	return RawJsonError{respDataRaw.Errors}
 	// }
-	if respDataRaw.Code != 200 {
+	if respDataRaw.Code != OK {
 		return fmt.Errorf("code %d: %s", respDataRaw.Code, respDataRaw.Message)
 	}
 	return unpackErr
@@ -131,7 +133,7 @@ func (p *Client) Put(target string, response interface{}, options ...Option) err
 	// if respDataRaw.Errors != nil {
 	// 	return RawJsonError{respDataRaw.Errors}
 	// }
-	if respDataRaw.Code != 200 {
+	if respDataRaw.Code != OK {
 		return fmt.Errorf("code %d: %s", respDataRaw.Code, respDataRaw.Message)
 	}
 	return unpackErr
@@ -161,7 +163,7 @@ func (p *Client) Delete(target string, response interface{}, options ...Option) 
 	// if respDataRaw.Errors != nil {
 	// 	return RawJsonError{respDataRaw.Errors}
 	// }
-	if respDataRaw.Code != 200 {
+	if respDataRaw.Code != 0 {
 		return fmt.Errorf("code %d: %s", respDataRaw.Code, respDataRaw.Message)
 	}
 	return unpackErr

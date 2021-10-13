@@ -51,61 +51,6 @@ func dbgPrintf(format string, a ...interface{}) {
 	}
 }
 
-func DumpObject(objects *codegen.Objects, object *codegen.Object) {
-	if object == nil {
-		return
-	}
-
-	// data.Objects
-	// data.QueryRoot.Fields
-	// _ = data.Objects[0].Fields[0].ShortResolverDeclaration()
-	// _ = data.Objects[0].Fields[0].Arguments[0].Name
-	dbgPrintf("\n=> objects: %#v\n", object.Type)
-
-	for _, field := range object.Fields {
-		dbgPrintln("=> field:", field.Name, GetSelection(objects, field, false))
-		// 	fmt.Println("=> field:", field.Object.Name, field.Name, field.FieldDefinition.Directives)
-		// 	if strings.HasPrefix(field.Name, "__") {
-		// 		continue
-		// 	}
-		// 	if directive := field.FieldDefinition.Directives.ForName("select"); directive != nil {
-		// 		forName := directive.Arguments.ForName("for")
-		// 		fmt.Println("..field.directive:", directive.Name, forName.Name, forName.Value, ShouldSelect(directive))
-		// 	}
-
-		// 	for _, innerField := range field.TypeReference.Definition.Fields {
-		// 		fmt.Println("..", innerField.Name, innerField.Type)
-		// 		if directive := innerField.Directives.ForName("select"); directive != nil {
-		// 			forName := directive.Arguments.ForName("for")
-		// 			fmt.Println("..innerField.directive:", directive.Name, forName.Name, forName.Value, ShouldSelect(directive))
-		// 		}
-
-		// 		innerObject := data.Objects.ByName(innerField.Name)
-		// 		if innerObject != nil {
-		// 			DbgPrint(data, innerObject)
-		// 		}
-		// 	}
-		// }
-	}
-}
-
-func Unused_GetArguments(objects *codegen.Objects, field *codegen.Field) string {
-	arguments := ""
-	for _, v := range field.Arguments {
-		arguments += fmt.Sprintf("%s %s; ", v.Name, v.Type)
-	}
-	return arguments
-}
-
-func Unused_GetInputs(data *codegen.Data) string {
-	inputs := ""
-	for _, v := range data.Inputs {
-		inputs += fmt.Sprintf("%s %s %v; ", v.Name, v.Type, v.Fields)
-	}
-
-	return ""
-}
-
 func GetSelection(objects *codegen.Objects, field *codegen.Field, refer bool) string {
 	if !refer {
 		dbgPrintln("\n+++++++++++++++++++++++++++++++++++++++++")
@@ -228,7 +173,6 @@ func StaticCheck(data *codegen.Data) {
 
 func (m *Plugin) GenerateCode(data *codegen.Data) error {
 	StaticCheck(data)
-	DumpObject(&data.Objects, data.Objects.ByName("query"))
 
 	abs, err := filepath.Abs(m.filename)
 	if err != nil {
@@ -244,15 +188,9 @@ func (m *Plugin) GenerateCode(data *codegen.Data) error {
 			TypeName: m.typeName,
 		},
 		Funcs: template.FuncMap{
-			// "shouldHide": func(directive *ast.Directive) bool {
-			// 	return ShouldHide(directive)
-			// },
 			"getSelection": func(objects *codegen.Objects, field *codegen.Field, refer bool) string {
 				return GetSelection(objects, field, refer)
 			},
-			// "getArguments": func(objects *codegen.Objects, field *codegen.Field) string {
-			// 	return GetArguments(objects, field)
-			// },
 			"getURL": func(field *codegen.Field) string {
 				return GetURL(field)
 			},
