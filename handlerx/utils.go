@@ -52,7 +52,7 @@ func writeJSON(w io.Writer, r *graphql.Response, isRESTful bool) {
 
 	// 2. For RESTful API
 	response := &RESTResponse{
-		Code: http.StatusOK,
+		Code: 0,
 		Data: r.Data,
 	}
 

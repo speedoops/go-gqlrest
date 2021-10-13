@@ -1,3 +1,8 @@
+# Temporary files for IDE
+.idea
+.vscode
+.VSCodeCounter
+
 # Binaries for programs and plugins
 *.exe
 *.exe~
