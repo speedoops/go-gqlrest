@@ -168,12 +168,14 @@ func convertFromJSONToGraphQL(r *http.Request, argTypes StringMap, k string, v i
 		//dbgPrintf(r, "ignore param %v.%v=%v", argTypes, k, v)
 		return ""
 	}
+	// 规则1：非 Null 类型与可 Null 类型的转换规则相同，先统一
 	argType = strings.ReplaceAll(argType, "!", "")
 	// dbgPrintf(r, "arg: %s %s = %v", argType, k, v)
 
 	var paramKV string
 	switch argType {
 	case "Boolean", "Int", "Float":
+		// 规则2：标量类型中，数字和布尔类型不加引号
 		paramKV = fmt.Sprintf(`%s:%v`, k, v)
 	case "[Boolean]", "[Int]", "[Float]":
 		vars := getSliceInterface(v)
@@ -182,11 +184,13 @@ func convertFromJSONToGraphQL(r *http.Request, argTypes StringMap, k string, v i
 			tmp := fmt.Sprintf("%v", vv)
 			vals = append(vals, tmp)
 		}
+		// 规则3：标量的数组类型，内部元素的处理规则同非数组类型
 		paramKV = fmt.Sprintf(`%s:[%s]`, k, strings.Join(vals, ","))
 	case "[ID]", "[String]":
 		vars := getSliceInterface(v)
 		var vals []string
 		for _, vv := range vars {
+			// 规则4：字符串类型需要加引号
 			tmp := fmt.Sprintf("%q", vv)
 			vals = append(vals, tmp)
 		}
@@ -194,8 +198,10 @@ func convertFromJSONToGraphQL(r *http.Request, argTypes StringMap, k string, v i
 	default:
 		if typeKind, ok := typeName2TypeKinds[argType]; ok {
 			if typeKind == "ENUM" {
+				// 规则5：枚举类型不加引号
 				paramKV = fmt.Sprintf(`%s:%v`, k, v)
 			} else if typeKind == "INPUT_OBJECT" {
+				// 规则6：INPUT 类型递归展开
 				if inputTypes, ok := inputType2FieldDefinitions[argType]; ok {
 					queryParamsString := make([]string, 0)
 					queryParams, _ := v.(map[string]interface{})
@@ -208,12 +214,13 @@ func convertFromJSONToGraphQL(r *http.Request, argTypes StringMap, k string, v i
 						queryParamsStringX := strings.Join(queryParamsString, ",")
 						paramKV = fmt.Sprintf(`%s:{%s}`, k, queryParamsStringX)
 					}
-				} else {
+				} else { // 不可能会进入这里
 					panic(fmt.Sprintf("mapping: unknown input type %#v", v))
 				}
 			}
 		} else {
-			paramKV = fmt.Sprintf(`%s:"%v"`, k, v)
+			// 默认规则：返回空字符串忽略不能识别的内容，最大化容错处理；进到这里可能是出问题了，记录日志
+			// paramKV = fmt.Sprintf(`%s:"%v"`, k, v)
 			dbgPrintf("mapping: unknown argument type %#v", v)
 		}
 	}

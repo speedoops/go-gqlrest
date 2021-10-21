@@ -32,7 +32,7 @@ func RegisterHandlers(r *chi.Mux, srv http.Handler, prefix string) {
 
 	{{ $root := . }}
 
-	// Statistics: Queries={{ .QueryRoot.Fields | len }}, Mutations={{ .MutationRoot.Fields | len }}, Enums={{ .Schema.Types | len }}, Inputs={{ .Inputs | len }} 
+	// Statistics: Queries={{ .QueryRoot.Fields | len }}, Mutations={{ .MutationRoot.Fields | len }}, Types={{ .Schema.Types | len }}, Inputs={{ .Inputs | len }} 
 
 	// Part 1/4: Query Objects
 	{
