@@ -107,7 +107,9 @@ func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams
 
 		queryParamsString := make([]string, 0)
 		for k, v := range queryParams {
-			if paramKV := convertFromJSONToGraphQL(r, argTypes, k, v); paramKV != "" {
+			if paramKV, err := formatInputsToGraphQL(argTypes, k, v); err != nil {
+				return "", err
+			} else {
 				queryParamsString = append(queryParamsString, paramKV)
 			}
 		}
@@ -226,4 +228,79 @@ func convertFromJSONToGraphQL(r *http.Request, argTypes StringMap, k string, v i
 	}
 
 	return paramKV
+}
+
+func formatInputsToGraphQL(argTypes StringMap, k string, v interface{}) (string, error) {
+	argType, ok := argTypes[k]
+	if !ok {
+		//dbgPrintf("ignore param %v %v=%v", argTypes, k, v)
+		return "", nil
+	}
+	isArray, underlayingType := getUnderlayingArgType(argType)
+
+	if !isArray {
+		// 非数组比较简单，就是 k:v
+		if tmp, err := formatArgValueToGraphQL(underlayingType, k, v); err != nil {
+			return "", err
+		} else {
+			return fmt.Sprintf(`%s:%s`, k, tmp), nil
+		}
+	}
+
+	// 数组类型比较麻烦，k:[v,v] 或 k:["v","v"]
+	vars := getSliceInterface(v)
+	var vals []string
+	for _, vv := range vars {
+		if tmp, err := formatArgValueToGraphQL(underlayingType, k, vv); err != nil {
+			return "", err
+		} else {
+			vals = append(vals, tmp)
+		}
+	}
+	return fmt.Sprintf(`%s:[%s]`, k, strings.Join(vals, ",")), nil
+}
+
+func getUnderlayingArgType(argType string) (bool, string) {
+	isArray := strings.HasPrefix(argType, "[")
+
+	argType = strings.ReplaceAll(argType, "[", "")
+	argType = strings.ReplaceAll(argType, "]", "")
+	argType = strings.ReplaceAll(argType, "!", "")
+
+	return isArray, argType
+}
+
+func formatArgValueToGraphQL(underlayingType string, k string, v interface{}) (string, error) {
+	switch underlayingType {
+	case "Boolean", "Int", "Float":
+		return fmt.Sprintf(`%v`, v), nil
+	case "ID", "String":
+		return fmt.Sprintf("%q", v), nil
+	default:
+		if typeKind, ok := typeName2TypeKinds[underlayingType]; ok {
+			if typeKind == "ENUM" {
+				return fmt.Sprintf(`%v`, v), nil
+			}
+
+			if typeKind == "INPUT_OBJECT" {
+				if inputTypes, ok := inputType2FieldDefinitions[underlayingType]; ok {
+					queryParamsString := make([]string, 0)
+					queryParams, _ := v.(map[string]interface{})
+					for k, v := range queryParams {
+						if paramKV, err := formatInputsToGraphQL(inputTypes, k, v); err != nil {
+							return "", err
+						} else {
+							queryParamsString = append(queryParamsString, paramKV)
+						}
+					}
+					if len(queryParamsString) > 0 {
+						queryParamsStringX := strings.Join(queryParamsString, ",")
+						return fmt.Sprintf(`{%s}`, queryParamsStringX), nil
+					}
+				}
+			}
+		}
+	}
+
+	return "", fmt.Errorf("mapping: unknown argument type %#v", v)
 }
