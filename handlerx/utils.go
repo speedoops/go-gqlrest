@@ -97,22 +97,18 @@ func writeJSON(w io.Writer, r *graphql.Response, isRESTful bool) {
 	}
 }
 
-func writeJSONError(w io.Writer, code int, msg string) {
-	writeJSON(w, &graphql.Response{
-		Extensions: map[string]interface{}{
-			"code": code,
-		},
-		Errors: gqlerror.List{{Message: msg}},
-	}, false)
+func writeJSONError(w io.Writer, code int, isRESTful bool, msg string) {
+	err := gqlerror.Error{
+		Message:    msg,
+		Extensions: map[string]interface{}{"code": code}}
+	writeJSON(w, &graphql.Response{Errors: gqlerror.List{&err}}, isRESTful)
 }
 
-func writeJSONErrorf(w io.Writer, code int, format string, args ...interface{}) {
-	writeJSON(w, &graphql.Response{
-		Extensions: map[string]interface{}{
-			"code": code,
-		},
-		Errors: gqlerror.List{{Message: fmt.Sprintf(format, args...)}},
-	}, false)
+func writeJSONErrorf(w io.Writer, code int, isRESTful bool, format string, args ...interface{}) {
+	err := gqlerror.Error{
+		Message:    fmt.Sprintf(format, args...),
+		Extensions: map[string]interface{}{"code": code}}
+	writeJSON(w, &graphql.Response{Errors: gqlerror.List{&err}}, isRESTful)
 }
 
 type Printer interface {
