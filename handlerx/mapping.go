@@ -122,8 +122,7 @@ func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams
 	// 3. Field Selection
 	selection, ok := graphOperation2RESTSelection[operationName]
 	if !ok {
-		err := errors.New("FIXME: OOPS! no match selection. " + rctx.RoutePattern())
-		return "", err
+		panic("OOPS! no matching field selection for " + rctx.RoutePattern())
 	}
 	queryString += selection // eg. "query { todos(ids:[\"T9527\"],){id,text,done,user{id}}"
 
@@ -136,98 +135,32 @@ func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams
 	return queryString, nil
 }
 
-func getMapStringInterface(v interface{}) map[string]interface{} {
-	if v == nil {
-		return make(map[string]interface{})
-	}
-	if vm, ok := v.(map[string]interface{}); ok {
-		return vm
-	}
-	return make(map[string]interface{})
-}
+// func getMapStringInterface(v interface{}) map[string]interface{} {
+// 	if v == nil {
+// 		return make(map[string]interface{})
+// 	}
+// 	if vm, ok := v.(map[string]interface{}); ok {
+// 		return vm
+// 	}
+// 	return make(map[string]interface{})
+// }
 
-func getSliceInterface(v interface{}) []interface{} {
+func getSliceInterface(v interface{}) ([]interface{}, error) {
 	ret := []interface{}{}
 	if v == nil {
-		return ret
+		return ret, nil
 	}
 	if vs, ok := v.([]interface{}); ok {
-		return vs
+		return vs, nil
 	}
 	if vs, ok := v.(string); ok {
 		ss := strings.Split(vs, ",")
 		for _, ssv := range ss {
 			ret = append(ret, ssv)
 		}
-		return ret
+		return ret, nil
 	}
-	panic(fmt.Sprintf("mapping: unknown slice interface type %#v", v))
-}
-
-func convertFromJSONToGraphQL(r *http.Request, argTypes StringMap, k string, v interface{}) string {
-	argType, ok := argTypes[k]
-	if !ok {
-		//dbgPrintf(r, "ignore param %v.%v=%v", argTypes, k, v)
-		return ""
-	}
-	// 规则1：非 Null 类型与可 Null 类型的转换规则相同，先统一
-	argType = strings.ReplaceAll(argType, "!", "")
-	// dbgPrintf(r, "arg: %s %s = %v", argType, k, v)
-
-	var paramKV string
-	switch argType {
-	case "Boolean", "Int", "Float":
-		// 规则2：标量类型中，数字和布尔类型不加引号
-		paramKV = fmt.Sprintf(`%s:%v`, k, v)
-	case "[Boolean]", "[Int]", "[Float]":
-		vars := getSliceInterface(v)
-		var vals []string
-		for _, vv := range vars {
-			tmp := fmt.Sprintf("%v", vv)
-			vals = append(vals, tmp)
-		}
-		// 规则3：标量的数组类型，内部元素的处理规则同非数组类型
-		paramKV = fmt.Sprintf(`%s:[%s]`, k, strings.Join(vals, ","))
-	case "[ID]", "[String]":
-		vars := getSliceInterface(v)
-		var vals []string
-		for _, vv := range vars {
-			// 规则4：字符串类型需要加引号
-			tmp := fmt.Sprintf("%q", vv)
-			vals = append(vals, tmp)
-		}
-		paramKV = fmt.Sprintf(`%s:[%s]`, k, strings.Join(vals, ","))
-	default:
-		if typeKind, ok := typeName2TypeKinds[argType]; ok {
-			if typeKind == "ENUM" {
-				// 规则5：枚举类型不加引号
-				paramKV = fmt.Sprintf(`%s:%v`, k, v)
-			} else if typeKind == "INPUT_OBJECT" {
-				// 规则6：INPUT 类型递归展开
-				if inputTypes, ok := inputType2FieldDefinitions[argType]; ok {
-					queryParamsString := make([]string, 0)
-					queryParams, _ := v.(map[string]interface{})
-					for k, v := range queryParams {
-						if paramKV := convertFromJSONToGraphQL(r, inputTypes, k, v); paramKV != "" {
-							queryParamsString = append(queryParamsString, paramKV)
-						}
-					}
-					if len(queryParamsString) > 0 {
-						queryParamsStringX := strings.Join(queryParamsString, ",")
-						paramKV = fmt.Sprintf(`%s:{%s}`, k, queryParamsStringX)
-					}
-				} else { // 不可能会进入这里
-					panic(fmt.Sprintf("mapping: unknown input type %#v", v))
-				}
-			}
-		} else {
-			// 默认规则：返回空字符串忽略不能识别的内容，最大化容错处理；进到这里可能是出问题了，记录日志
-			// paramKV = fmt.Sprintf(`%s:"%v"`, k, v)
-			dbgPrintf("mapping: unknown argument type %#v", v)
-		}
-	}
-
-	return paramKV
+	return nil, fmt.Errorf("mapping: require slice but got %#v", v)
 }
 
 func formatInputsToGraphQL(argTypes StringMap, k string, v interface{}) (string, error) {
@@ -248,7 +181,10 @@ func formatInputsToGraphQL(argTypes StringMap, k string, v interface{}) (string,
 	}
 
 	// 数组类型比较麻烦，k:[v,v] 或 k:["v","v"]
-	vars := getSliceInterface(v)
+	vars, err := getSliceInterface(v)
+	if err != nil {
+		return "", err
+	}
 	var vals []string
 	for _, vv := range vars {
 		if tmp, err := formatArgValueToGraphQL(underlayingType, k, vv); err != nil {
