@@ -51,15 +51,10 @@ func dbgPrintf(format string, a ...interface{}) {
 	}
 }
 
-func GetSelection(objects *codegen.Objects, field *codegen.Field, refer bool) string {
-	if !refer {
-		dbgPrintln("\n+++++++++++++++++++++++++++++++++++++++++")
-	}
-	dbgPrintln("=> field:", field.Object.Name, field.Name, field.FieldDefinition.Directives)
-
+func IsIgnoreField(field *codegen.Field) bool {
 	// 忽略内置字段
 	if strings.HasPrefix(field.Name, "__") {
-		return ""
+		return true
 	}
 
 	// 忽略未选字段
@@ -67,7 +62,22 @@ func GetSelection(objects *codegen.Objects, field *codegen.Field, refer bool) st
 	if directive != nil {
 		dbgPrintln("field.directive:", directive.Name, ShouldHide(directive))
 	}
+
 	if ShouldHide(directive) {
+		return true
+	}
+
+	return false
+}
+
+func GetSelection(objects *codegen.Objects, field *codegen.Field, refer bool) string {
+	if !refer {
+		dbgPrintln("\n+++++++++++++++++++++++++++++++++++++++++")
+	}
+	dbgPrintln("=> field:", field.Object.Name, field.Name, field.FieldDefinition.Directives)
+
+	// 忽略内置字段
+	if IsIgnoreField(field) {
 		return ""
 	}
 
