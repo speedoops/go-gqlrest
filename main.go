@@ -18,14 +18,14 @@ var (
 func main() {
 	flag.Parse()
 
-	cfg, err := config.LoadConfigFromDefaultLocations()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "failed to load config", err.Error())
-		os.Exit(2)
-	}
-
 	if *flagCode {
-		// 生成代码，没有任何参数时，也可以生成
+		// 自动生成代码
+		cfg, err := config.LoadConfigFromDefaultLocations()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "failed to load config", err.Error())
+			os.Exit(2)
+		}
+
 		err = api.Generate(cfg,
 			api.AddPlugin(restgen.New("graph/generated/rest.go", "Query")), // This is the magic line
 		)
@@ -37,9 +37,14 @@ func main() {
 	}
 
 	if *flagDoc {
-		// 生成openapi文档
+		// 自动生成文档
+		cfg, err := config.LoadConfigFromDefaultLocations()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "failed to load config", err.Error())
+			os.Exit(2)
+		}
 		err = api.Generate(cfg,
-			api.AddPlugin(restgen.NewDocPlugin("graph/generated/rest.go", "YAML")), //this is the magic line
+			api.AddPlugin(restgen.NewDocPlugin("graph/generated/rest.yaml", "YAML")), //this is the magic line
 		)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
