@@ -141,7 +141,7 @@ func formatVariableType(typ string) (formatType, formatter string) {
 	length := len(typ)
 	if string(typ[length-1]) == "!" {
 		return formatVariableType(string(typ[:length-1]))
-	} else if typ == "String" || typ == "ID" || typ == "Tiime" {
+	} else if typ == "String" || typ == "ID" || typ == "Time" {
 		return "string", ""
 	} else if typ == "Int" {
 		return "integer", "int64"
@@ -382,7 +382,13 @@ func parseAPI(data *codegen.Object, apis map[string]*API, components map[string]
 				if len(field.Args) > 0 {
 					paramName := field.Args[0].Type.NamedType
 					// fmt.Printf("url:%v, name:%v, paramName:%v, args:%+v", url, name, paramName, field.Args[0])
-					description = components[paramName].Properties[name].Description
+					input := components[paramName]
+					variable, ok := input.Properties[name]
+					if ok {
+						description = variable.Description
+					} else {
+						dbgPrintf("input:%v variable:%v not found", paramName, name)
+					}
 				}
 				obj.Parameters = append(obj.Parameters, &APIParameter{
 					In:          "path",
