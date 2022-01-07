@@ -240,8 +240,9 @@ func GenerateOpenAPIDoc(yamlFile string, schema *ast.Schema, query *codegen.Obje
 			objects[typ.Name] = parseObject(typ)
 		}
 	}
-	parseAPI(query, apis, objects, "GET")
-	parseAPI(mutation, apis, objects, "POST")
+
+	apis = parseAPI(query, apis, objects, "GET")
+	apis = parseAPI(mutation, apis, objects, "POST")
 
 	// 获取全部定义之后，开始生成OpenAPI文档
 	doc := &OpenAPIDoc{
@@ -291,8 +292,8 @@ func parseAPI(data *codegen.Object, apis map[string]*API, components map[string]
 		}
 
 		method := GetMethod(field, defaultMethod)
-		api, exist := apis[uri]
 		uri = strings.ReplaceAll(uri, "\"", "")
+		api, exist := apis[uri]
 		method = strings.ReplaceAll(method, "\"", "")
 		if !exist {
 			api = &API{}
