@@ -419,7 +419,15 @@ func parseAPI(data *codegen.Object, apis map[string]*API, components map[string]
 		obj.OperartionID = field.Name
 		obj.Description = field.Description
 
-		responseName := strings.Title(field.Name) + "Response"
+		//第一个大写字母前的小写字符个数<=2，则都转大写
+		//其他情况，只转第一个大写
+		responseName := field.Name + "Response"
+		if responseName[0:1] >= "a" && responseName[1:2] >= "a" && responseName[2:3] <= "Z" {
+			responseName = strings.ToUpper(responseName[0:2]) + responseName[2:]
+		} else {
+			responseName = strings.Title(responseName)
+		}
+
 		obj.RequestBody = parseRequestBody(field)
 		obj.Responses = generateAPIResponse(responseName)
 
