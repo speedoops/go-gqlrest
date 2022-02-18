@@ -3,7 +3,6 @@ package restgen
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -13,6 +12,11 @@ import (
 	"github.com/99designs/gqlgen/plugin"
 	"github.com/vektah/gqlparser/v2/ast"
 	"gopkg.in/yaml.v2"
+)
+
+const (
+	errorResponseObject = "ErrorResponse"
+	uploadObject        = "Upload"
 )
 
 func NewDocPlugin(filename string, typename string) plugin.Plugin {
@@ -42,20 +46,20 @@ func (m *DocPlugin) GenerateCode(data *codegen.Data) error {
 		return err
 	}
 
-	filename := filepath.Base(m.filename)
-	filenameOnly := strings.TrimSuffix(filename, path.Ext(filename))
-	dir := filepath.Dir(abs)
-	yamlFile := filepath.Join(dir, filenameOnly+".yaml")
-	return GenerateOpenAPIDoc(yamlFile, data.Schema, data.QueryRoot, data.MutationRoot)
+	dir := filepath.Join(filepath.Dir(abs), "apispec")
+	os.MkdirAll(dir, os.ModePerm)
+	return GenerateOpenAPIDoc(dir, data.Schema, data.QueryRoot, data.MutationRoot)
 }
 
 // 对象（包含入参、枚举、返回值）
 type Object struct {
-	Type        string                 `yaml:"type"`
-	Description string                 `yaml:"description,omitempty"`
-	Enum        []string               `yaml:"enum,omitempty"`
-	Required    []string               `yaml:"required,omitempty"`
-	Properties  map[string]*SchemaType `yaml:"properties,omitempty"`
+	name           string
+	Type           string                 `yaml:"type"`
+	Description    string                 `yaml:"description,omitempty"`
+	Enum           []string               `yaml:"enum,omitempty"`
+	Required       []string               `yaml:"required,omitempty"`
+	Properties     map[string]*SchemaType `yaml:"properties,omitempty"`
+	relatedObjects []string               //依赖的对象列表
 }
 
 // openapi文档对象
@@ -75,11 +79,37 @@ type OpenAPIInfo struct {
 
 // api请求方法
 type API struct {
-	Get    *APIObject `yaml:"get,omitempty"`
-	POST   *APIObject `yaml:"post,omitempty"`
-	PUT    *APIObject `yaml:"put,omitempty"`
-	Patch  *APIObject `yaml:"patch,omitempty"`
-	Delete *APIObject `yaml:"delete,omitempty"`
+	uri           string
+	Get           *APIObject `yaml:"get,omitempty"`
+	POST          *APIObject `yaml:"post,omitempty"`
+	PUT           *APIObject `yaml:"put,omitempty"`
+	Patch         *APIObject `yaml:"patch,omitempty"`
+	Delete        *APIObject `yaml:"delete,omitempty"`
+	relatedObjecs []string
+}
+
+func (api *API) Tags() []string {
+	if api.Get != nil {
+		return api.Get.Tags
+	}
+
+	if api.POST != nil {
+		return api.POST.Tags
+	}
+
+	if api.PUT != nil {
+		return api.PUT.Tags
+	}
+
+	if api.Patch != nil {
+		return api.Patch.Tags
+	}
+
+	if api.Delete != nil {
+		return api.Delete.Tags
+	}
+
+	return []string{"default"}
 }
 
 // api
@@ -101,8 +131,9 @@ type APIParameter struct {
 }
 
 type APIRequestBody struct {
-	Required bool                `yaml:"required"`
-	Content  *APIResponseContent `yaml:"content"`
+	Required       bool                `yaml:"required"`
+	Content        *APIResponseContent `yaml:"content"`
+	relatedObjects []string
 }
 
 type APIResponse struct {
@@ -125,11 +156,12 @@ type TypeBase struct {
 }
 
 type SchemaType struct {
-	Type        string    `yaml:"type,omitempty"`
-	Description string    `yaml:"description,omitempty"`
-	Format      string    `yaml:"format,omitempty"`
-	Ref         string    `yaml:"$ref,omitempty"`
-	Items       *TypeBase `yaml:"items,omitempty"`
+	Type           string    `yaml:"type,omitempty"`
+	Description    string    `yaml:"description,omitempty"`
+	Format         string    `yaml:"format,omitempty"`
+	Ref            string    `yaml:"$ref,omitempty"`
+	Items          *TypeBase `yaml:"items,omitempty"`
+	relatedObjects []string
 }
 
 type Component struct {
@@ -171,6 +203,7 @@ func isRequired(typ string) bool {
 // 生成错误返回值对象
 func generateErrorResponse() *Object {
 	return &Object{
+		name:        errorResponseObject,
 		Type:        "object",
 		Description: "http error response",
 		Properties: map[string]*SchemaType{
@@ -190,6 +223,7 @@ func generateErrorResponse() *Object {
 // generateUploadObject生成上传对象
 func generateUploadObject() *Object {
 	return &Object{
+		name:        uploadObject,
 		Type:        "object",
 		Description: "upload object",
 		Properties: map[string]*SchemaType{
@@ -215,15 +249,11 @@ func generateUploadObject() *Object {
 }
 
 // GenerateOpenAPIDoc 生成openapi文档
-func GenerateOpenAPIDoc(yamlFile string, schema *ast.Schema, query *codegen.Object, mutation *codegen.Object) error {
+func GenerateOpenAPIDoc(yamlDir string, schema *ast.Schema, query *codegen.Object, mutation *codegen.Object) error {
 	apis := make(map[string]*API)
 	objects := make(map[string]*Object)
-	objects["ErrorResponse"] = generateErrorResponse()
-	objects["Upload"] = generateUploadObject()
-
-	components := &Component{
-		Schemas: objects,
-	}
+	objects[errorResponseObject] = generateErrorResponse()
+	objects[uploadObject] = generateUploadObject()
 
 	for _, typ := range schema.Types {
 		if strings.HasPrefix(typ.Name, "__") {
@@ -244,17 +274,47 @@ func GenerateOpenAPIDoc(yamlFile string, schema *ast.Schema, query *codegen.Obje
 	apis = parseAPI(query, apis, objects, "GET")
 	apis = parseAPI(mutation, apis, objects, "POST")
 
+	apiTagMap := make(map[string][]*API)
+	for _, api := range apis {
+		tag := api.Tags()[0]
+		cfg, ok := apiTagMap[tag]
+		if !ok {
+			cfg = make([]*API, 0, 1)
+		}
+		cfg = append(cfg, api)
+		apiTagMap[tag] = cfg
+	}
+
 	// 获取全部定义之后，开始生成OpenAPI文档
+	for tag, api := range apiTagMap {
+		yamlFile := filepath.Join(yamlDir, tag+".yaml")
+		if err := saveOpenAPIDoc(yamlFile, api, objects); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func saveOpenAPIDoc(yamlFile string, apis []*API, objects map[string]*Object) error {
 	doc := &OpenAPIDoc{
 		OpenAPI: "3.0.1",
-		//Tags:    []string{"CLOUD OPENAPI"},
 		Info: &OpenAPIInfo{
 			Version:     "1.0.0",
-			Description: "DO NOT EDIT !",
-			Title:       "SANGFOR CLOUD BG OPENAPI",
+			Description: "深信服HCI OpenAPI接口文档，DO NOT EDIT !",
+			Title:       "深信服HCI OpenAPI接口文档",
 		},
-		Paths:      apis,
-		Components: components,
+		Paths: make(map[string]*API),
+		Components: &Component{
+			Schemas: make(map[string]*Object),
+		},
+	}
+
+	for _, api := range apis {
+		doc.Paths[api.uri] = api
+		// 添加关联对象
+		for _, objName := range api.relatedObjecs {
+			addRelatedObjectsToComponents(doc, objName, objects)
+		}
 	}
 
 	body, err := yaml.Marshal(doc)
@@ -268,10 +328,28 @@ func GenerateOpenAPIDoc(yamlFile string, schema *ast.Schema, query *codegen.Obje
 		dbgPrintf("open file error:%s", err.Error())
 		return err
 	}
+	defer file.Close()
 
-	file.Write(body)
+	_, err = file.Write(body)
+	if err != nil {
+		return err
+	}
 
-	return err
+	return nil
+}
+
+// 递归的将关联对象，加入到components中
+func addRelatedObjectsToComponents(doc *OpenAPIDoc, objName string, objects map[string]*Object) {
+	obj, ok := objects[objName]
+	if !ok {
+		dbgPrintf("object :%v not exist", objName)
+		return
+	}
+
+	doc.Components.Schemas[obj.name] = obj
+	for _, name := range obj.relatedObjects {
+		addRelatedObjectsToComponents(doc, name, objects)
+	}
 }
 
 // parseAPI 解析API定义
@@ -296,7 +374,9 @@ func parseAPI(data *codegen.Object, apis map[string]*API, components map[string]
 		api, exist := apis[uri]
 		method = strings.ReplaceAll(method, "\"", "")
 		if !exist {
-			api = &API{}
+			api = &API{
+				uri: uri,
+			}
 			apis[uri] = api
 		}
 
@@ -324,15 +404,48 @@ func parseAPI(data *codegen.Object, apis map[string]*API, components map[string]
 			obj.Tags = []string{"default"}
 		}
 
+		// 通过tag指令category域，改写接口的tags
+		directive := field.FieldDefinition.Directives.ForName("tag")
+		if directive != nil {
+			for _, arg := range directive.Arguments {
+				if arg.Name == "category" {
+					category := arg.Value.String()
+					category = strings.ReplaceAll(category, "\"", "")
+					obj.Tags = []string{category}
+				}
+			}
+		}
+
 		obj.OperartionID = field.Name
 		obj.Description = field.Description
-		obj.RequestBody = parseRequestBody(field)
-		obj.Responses = generateAPIResponse(field.Name)
 
-		responseName := strings.ToUpper(string(field.Name[0])) + string(field.Name[1:])
+		//第一个大写字母前的小写字符个数<=2，则都转大写
+		//其他情况，只转第一个大写
+		responseName := field.Name + "Response"
+		if responseName[0:1] >= "a" && responseName[1:2] >= "a" && responseName[2:3] <= "Z" {
+			responseName = strings.ToUpper(responseName[0:2]) + responseName[2:]
+		} else {
+			responseName = strings.Title(responseName)
+		}
+
+		obj.RequestBody = parseRequestBody(field)
+		obj.Responses = generateAPIResponse(responseName)
+
 		schema := parseType(field.FieldDefinition.Type)
 		schema.Description = field.FieldDefinition.Description
+
+		//记录关联对象
+		api.relatedObjecs = append(api.relatedObjecs, responseName, errorResponseObject)
+		if obj.RequestBody != nil && len(obj.RequestBody.relatedObjects) > 0 {
+			api.relatedObjecs = append(api.relatedObjecs, obj.RequestBody.relatedObjects...)
+		}
+
+		if len(schema.relatedObjects) > 0 {
+			api.relatedObjecs = append(api.relatedObjecs, schema.relatedObjects...)
+		}
+
 		responseObj := &Object{
+			name: responseName,
 			Type: "object",
 			Properties: map[string]*SchemaType{
 				"code": {
@@ -349,7 +462,7 @@ func parseAPI(data *codegen.Object, apis map[string]*API, components map[string]
 		}
 
 		// 注册返回值一级域
-		components[responseName+"Response"] = responseObj
+		components[responseName] = responseObj
 
 		if obj.RequestBody == nil {
 			// requestBody为nil,才遍历args参数
@@ -364,6 +477,11 @@ func parseAPI(data *codegen.Object, apis map[string]*API, components map[string]
 
 				schema := parseType(arg.Type)
 				schema.Description = arg.Description
+				// 记录关联对象
+				if len(schema.relatedObjects) > 0 {
+					api.relatedObjecs = append(api.relatedObjecs, schema.relatedObjects...)
+				}
+
 				param := &APIParameter{
 					In:          in, // 需要处理在path中的情况
 					Name:        arg.Name,
@@ -415,13 +533,14 @@ func parseRequestBody(field *codegen.Field) *APIRequestBody {
 		return nil
 	}
 
-	arg := field.Args[0]
+	objName := field.Args[0].Type.Name()
 	return &APIRequestBody{
-		Required: true,
+		relatedObjects: []string{objName},
+		Required:       true,
 		Content: &APIResponseContent{
 			Json: &SchemaObject{
 				Schema: &SchemaType{
-					Ref: "#/components/schemas/" + arg.Type.Name(),
+					Ref: "#/components/schemas/" + objName,
 				},
 			},
 		},
@@ -429,13 +548,13 @@ func parseRequestBody(field *codegen.Field) *APIRequestBody {
 }
 
 // generateDefaultResponse 生成默认返回值
-func generateAPIResponse(apiName string) map[string]*APIResponse {
+func generateAPIResponse(responseName string) map[string]*APIResponse {
 	return map[string]*APIResponse{
 		"200": {
 			Content: &APIResponseContent{
 				Json: &SchemaObject{
 					Schema: &SchemaType{
-						Ref: "#/components/schemas/" + strings.Title(apiName) + "Response",
+						Ref: "#/components/schemas/" + responseName,
 					},
 				},
 			},
@@ -445,7 +564,7 @@ func generateAPIResponse(apiName string) map[string]*APIResponse {
 			Content: &APIResponseContent{
 				Json: &SchemaObject{
 					Schema: &SchemaType{
-						Ref: "#/components/schemas/ErrorResponse",
+						Ref: "#/components/schemas/" + errorResponseObject,
 					},
 				},
 			},
@@ -456,6 +575,7 @@ func generateAPIResponse(apiName string) map[string]*APIResponse {
 
 func parseEnum(typ *ast.Definition) *Object {
 	enum := &Object{
+		name:        typ.Name,
 		Type:        "string",
 		Description: typ.Description,
 	}
@@ -475,6 +595,7 @@ func parseEnum(typ *ast.Definition) *Object {
 func parseObject(typ *ast.Definition) *Object {
 	properties := make(map[string]*SchemaType)
 	obj := &Object{
+		name:        typ.Name,
 		Type:        "object",
 		Description: typ.Description,
 		Properties:  properties,
@@ -486,6 +607,10 @@ func parseObject(typ *ast.Definition) *Object {
 		}
 		schema := parseType(input.Type)
 		schema.Description = input.Description
+		if len(schema.relatedObjects) > 0 {
+			// 记录关联对象
+			obj.relatedObjects = append(obj.relatedObjects, schema.relatedObjects...)
+		}
 		properties[input.Name] = schema
 	}
 	return obj
@@ -508,6 +633,8 @@ func parseType(typObjec *ast.Type) *SchemaType {
 		} else {
 			// 自定义类型
 			items.Ref = "#/components/schemas/" + typ
+			// 记录关联对象
+			schema.relatedObjects = append(schema.relatedObjects, typ)
 		}
 	} else {
 		// 非数组
@@ -520,6 +647,8 @@ func parseType(typObjec *ast.Type) *SchemaType {
 		} else {
 			// 自定义类型
 			schema.Ref = "#/components/schemas/" + typ
+			// 记录关联对象
+			schema.relatedObjects = append(schema.relatedObjects, typ)
 		}
 	}
 
