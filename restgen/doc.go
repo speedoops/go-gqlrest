@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 
 	"github.com/99designs/gqlgen/codegen"
 	"github.com/99designs/gqlgen/codegen/config"
 	"github.com/99designs/gqlgen/plugin"
+	validatorConfig "github.com/speedoops/go-gqlrest/config"
 	"github.com/vektah/gqlparser/v2/ast"
 	"gopkg.in/yaml.v2"
 )
@@ -59,6 +61,13 @@ type Object struct {
 	Enum           []string               `yaml:"enum,omitempty"`
 	Required       []string               `yaml:"required,omitempty"`
 	Properties     map[string]*SchemaType `yaml:"properties,omitempty"`
+	Minimum        *float64               `yaml:"minimum,omitempty"` //Number取值限制
+	Maximum        *float64               `yaml:"maximum,omitempty"`
+	MinLength      *int64                 `yaml:"minLength,omitempty"` //字符串取值限制
+	MaxLength      *int64                 `yaml:"maxLength,omitempty"`
+	Pattern        *string                `yaml:"pattern,omitempty"`
+	MinItems       *int64                 `yaml:"minItems,omitempty"` //切片元素数量限制
+	MaxItems       *int64                 `yaml:"maxItems,omitempty"`
 	relatedObjects []string               //依赖的对象列表
 }
 
@@ -150,9 +159,16 @@ type SchemaObject struct {
 }
 
 type TypeBase struct {
-	Type   string `yaml:"type,omitempty"`
-	Format string `yaml:"format,omitempty"`
-	Ref    string `yaml:"$ref,omitempty"`
+	Type      string   `yaml:"type,omitempty"`
+	Format    string   `yaml:"format,omitempty"`
+	Ref       string   `yaml:"$ref,omitempty"`
+	Minimum   *float64 `yaml:"minimum,omitempty"` //Number取值限制
+	Maximum   *float64 `yaml:"maximum,omitempty"`
+	MinLength *int64   `yaml:"minLength,omitempty"` //字符串取值限制
+	MaxLength *int64   `yaml:"maxLength,omitempty"`
+	Pattern   *string  `yaml:"pattern,omitempty"`
+	MinItems  *int64   `yaml:"minItems,omitempty"` //切片元素数量限制
+	MaxItems  *int64   `yaml:"maxItems,omitempty"`
 }
 
 type SchemaType struct {
@@ -161,6 +177,13 @@ type SchemaType struct {
 	Format         string    `yaml:"format,omitempty"`
 	Ref            string    `yaml:"$ref,omitempty"`
 	Items          *TypeBase `yaml:"items,omitempty"`
+	Minimum        *float64  `yaml:"minimum,omitempty"` //Number取值限制
+	Maximum        *float64  `yaml:"maximum,omitempty"`
+	MinLength      *int64    `yaml:"minLength,omitempty"` //字符串取值限制
+	MaxLength      *int64    `yaml:"maxLength,omitempty"`
+	Pattern        *string   `yaml:"pattern,omitempty"`
+	MinItems       *int64    `yaml:"minItems,omitempty"` //切片元素数量限制
+	MaxItems       *int64    `yaml:"maxItems,omitempty"`
 	relatedObjects []string
 }
 
@@ -419,19 +442,11 @@ func parseAPI(data *codegen.Object, apis map[string]*API, components map[string]
 		obj.OperartionID = field.Name
 		obj.Description = field.Description
 
-		//第一个大写字母前的小写字符个数<=2，则都转大写
-		//其他情况，只转第一个大写
-		responseName := field.Name + "Response"
-		if responseName[0:1] >= "a" && responseName[1:2] >= "a" && responseName[2:3] <= "Z" {
-			responseName = strings.ToUpper(responseName[0:2]) + responseName[2:]
-		} else {
-			responseName = strings.Title(responseName)
-		}
-
+		responseName := strings.Title(field.Name) + "Response"
 		obj.RequestBody = parseRequestBody(field)
 		obj.Responses = generateAPIResponse(responseName)
 
-		schema := parseType(field.FieldDefinition.Type)
+		schema := parseType(field.Name, field.FieldDefinition.Type, nil)
 		schema.Description = field.FieldDefinition.Description
 
 		//记录关联对象
@@ -475,8 +490,9 @@ func parseAPI(data *codegen.Object, apis map[string]*API, components map[string]
 					required = true
 				}
 
-				schema := parseType(arg.Type)
+				schema := parseType(arg.Name, arg.Type, &arg.ArgumentDefinition.Directives)
 				schema.Description = arg.Description
+
 				// 记录关联对象
 				if len(schema.relatedObjects) > 0 {
 					api.relatedObjecs = append(api.relatedObjecs, schema.relatedObjects...)
@@ -605,21 +621,25 @@ func parseObject(typ *ast.Definition) *Object {
 		if isRequired(input.Type.String()) {
 			obj.Required = append(obj.Required, input.Name)
 		}
-		schema := parseType(input.Type)
+
+		schema := parseType(input.Name, input.Type, &input.Directives)
 		schema.Description = input.Description
+
 		if len(schema.relatedObjects) > 0 {
 			// 记录关联对象
 			obj.relatedObjects = append(obj.relatedObjects, schema.relatedObjects...)
 		}
 		properties[input.Name] = schema
 	}
+
 	return obj
 }
 
-func parseType(typObjec *ast.Type) *SchemaType {
+func parseType(typName string, typObj *ast.Type, directives *ast.DirectiveList) *SchemaType {
 	schema := &SchemaType{}
-	typ, format := formatVariableType(typObjec.Name())
-	if isArray(typObjec.String()) {
+	typ, format := formatVariableType(typObj.Name())
+
+	if isArray(typObj.String()) {
 		// 数组
 		items := &TypeBase{}
 		schema.Type = "array"
@@ -652,5 +672,135 @@ func parseType(typObjec *ast.Type) *SchemaType {
 		}
 	}
 
+	var validator *validator
+	var isStringSlice bool
+	if directives != nil {
+		if numberValidator := directives.ForName("constraintNumber"); numberValidator != nil {
+			validator = parseConstraintDirectiver(typName, numberValidator)
+		} else if stringValidator := directives.ForName("constraintString"); stringValidator != nil {
+			validator = parseConstraintDirectiver(typName, stringValidator)
+		} else if sliceValidator := directives.ForName("constraintSlice"); sliceValidator != nil {
+			validator = parseConstraintDirectiver(typName, sliceValidator)
+		} else if stringSliceValidator := directives.ForName("constraintStringSlice"); stringSliceValidator != nil {
+			validator = parseConstraintDirectiver(typName, stringSliceValidator)
+			isStringSlice = true
+		}
+	}
+
+	if validator != nil {
+		schema.Maximum = validator.Maximum
+		schema.Minimum = validator.Minimum
+
+		schema.MaxItems = validator.MaxItems
+		schema.MinItems = validator.MinItems
+
+		if isStringSlice {
+			schema.Items.Pattern = validator.Pattern
+			schema.Items.MinLength = validator.MinLength
+			schema.Items.MaxLength = validator.MaxLength
+		} else {
+			schema.Pattern = validator.Pattern
+			schema.MaxLength = validator.MaxLength
+			schema.MinLength = validator.MinLength
+		}
+	}
+
 	return schema
+}
+
+type validator struct {
+	Minimum   *float64 //Number取值限制
+	Maximum   *float64
+	MinLength *int64 //字符串长度限制
+	MaxLength *int64
+	fomat     *string
+	Pattern   *string
+	MinItems  *int64 //切片元素数量限制
+	MaxItems  *int64
+}
+
+// 解析Constraint系列指令
+func parseConstraintDirectiver(variableName string, directive *ast.Directive) *validator {
+	obj := &validator{}
+	minimum := directive.Arguments.ForName("min")
+	if minimum == nil {
+		minimum = directive.Arguments.ForName("minimum")
+	}
+
+	if minimum != nil {
+		num, err := strconv.ParseFloat(minimum.Value.String(), 64)
+		if err != nil {
+			dbgPrintf("parse variable:%v minimum value:%v to float error:%v", variableName, minimum.Value.String(), err.Error())
+		} else {
+			obj.Minimum = &num
+		}
+	}
+
+	maximum := directive.Arguments.ForName("max")
+	if maximum == nil {
+		maximum = directive.Arguments.ForName("maximum")
+	}
+
+	if maximum != nil {
+		num, err := strconv.ParseFloat(maximum.Value.String(), 64)
+		if err != nil {
+			dbgPrintf("parse variable:%v maximum value:%v to float error:%v", variableName, maximum.Value.String(), err.Error())
+		} else {
+			obj.Maximum = &num
+		}
+	}
+
+	if format := directive.Arguments.ForName("format"); format != nil {
+		// 读取外部配置
+		formatValue := format.Value.String()
+		obj.fomat = &formatValue
+		va := validatorConfig.GetValidatorByFormat(formatValue)
+		if va != nil {
+			obj.Pattern = &va.Pattern
+			obj.MinLength = &va.MinLength
+			obj.MaxLength = &va.MaxLength
+		}
+	}
+
+	minLength := directive.Arguments.ForName("minLength")
+	if minLength != nil {
+		num, err := strconv.ParseInt(minLength.Value.String(), 10, 64)
+		if err != nil {
+			dbgPrintf("parse variable:%v minLength value:%v to int error:%v", variableName, minLength.Value.String(), err.Error())
+		} else {
+			obj.MinLength = &num
+		}
+	}
+
+	maxLength := directive.Arguments.ForName("maxLength")
+	if maxLength != nil {
+		num, err := strconv.ParseInt(maxLength.Value.String(), 10, 64)
+		if err != nil {
+			dbgPrintf("parse variable:%v maxLength value:%v to int error:%v", variableName, maxLength.Value.String(), err.Error())
+		} else {
+			obj.MaxLength = &num
+		}
+	}
+
+	minItems := directive.Arguments.ForName("minItems")
+	if minItems != nil {
+		num, err := strconv.ParseInt(minItems.Value.String(), 10, 64)
+		if err != nil {
+			dbgPrintf("parse variable:%v minItems value:%v to int error:%v", variableName, minItems.Value.String(), err.Error())
+		} else {
+			obj.MinItems = &num
+		}
+	}
+
+	maxItems := directive.Arguments.ForName("maxItems")
+	if maxItems != nil {
+		num, err := strconv.ParseInt(maxItems.Value.String(), 10, 64)
+		if err != nil {
+			dbgPrintf("parse variable:%v maxItems value:%v to int error:%v", variableName, maxItems.Value.String(), err.Error())
+		} else {
+			obj.MaxItems = &num
+		}
+	}
+
+	return obj
 }
