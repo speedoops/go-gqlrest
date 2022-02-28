@@ -24,7 +24,7 @@ func (h POST) Supports(r *http.Request) bool {
 	if err != nil || mediaType != "application/json" {
 		return false
 	}
-	return r.Method == "POST" || r.Method == "PUT"
+	return r.Method == "POST" || r.Method == "PUT" || r.Method == "PATCH"
 }
 
 func (h POST) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecutor) {
