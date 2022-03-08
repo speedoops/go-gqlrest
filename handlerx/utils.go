@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -36,6 +38,8 @@ type RESTResponse struct {
 	Data    json.RawMessage `json:"data"`
 }
 
+var numRegexp = regexp.MustCompile(`^\d+$`)
+
 func writeJSON(w io.Writer, r *graphql.Response, isRESTful bool) {
 	// 1. For GraphQL API
 	if !isRESTful {
@@ -49,6 +53,24 @@ func writeJSON(w io.Writer, r *graphql.Response, isRESTful bool) {
 		}
 		return
 	}
+
+	// 1.1 recover from panic
+	defer func() {
+		if err := recover(); err != nil {
+			var buf [4096]byte
+			n := runtime.Stack(buf[:], false)
+			dbgPrintf("restful response recover from panic:%v", string(buf[:n]))
+
+			r := &RESTResponse{
+				Code:    http.StatusInternalServerError,
+				Message: "unexpected error: unmarshal or write response error",
+			}
+			content, _ := json.Marshal(r)
+			if _, err := w.Write(content); err != nil {
+				panic(err)
+			}
+		}
+	}()
 
 	// 2. For RESTful API
 	response := &RESTResponse{
@@ -82,7 +104,17 @@ func writeJSON(w io.Writer, r *graphql.Response, isRESTful bool) {
 			}
 		}
 
-		response.Code, _ = strconv.Atoi(code)
+		if numRegexp.MatchString(code) {
+			// if code is number string
+			response.Code, _ = strconv.Atoi(code)
+		} else {
+			if code == errcode.ValidationFailed || code == errcode.ParseFailed {
+				response.Code = http.StatusUnprocessableEntity
+			} else {
+				response.Code = http.StatusInternalServerError
+			}
+		}
+
 		response.Message = strings.Join(msgs, "; ")
 	}
 
