@@ -19,15 +19,19 @@ import (
 const (
 	errorResponseObject = "ErrorResponse"
 	uploadObject        = "Upload"
+	ipObject            = "IP"
+	iprangeObject       = "IPRange"
+	macAddressObject    = "MAC"
 )
 
-func NewDocPlugin(filename string, typename string) plugin.Plugin {
-	return &DocPlugin{filename: filename, typeName: typename}
+func NewDocPlugin(filename string, typename string, isPublished bool) plugin.Plugin {
+	return &DocPlugin{filename: filename, typeName: typename, isPublished: isPublished}
 }
 
 type DocPlugin struct {
-	filename string
-	typeName string
+	filename    string
+	typeName    string
+	isPublished bool
 }
 
 var _ plugin.CodeGenerator = &DocPlugin{}
@@ -50,7 +54,7 @@ func (m *DocPlugin) GenerateCode(data *codegen.Data) error {
 
 	dir := filepath.Join(filepath.Dir(abs), "apispec")
 	os.MkdirAll(dir, os.ModePerm)
-	return GenerateOpenAPIDoc(dir, data.Schema, data.QueryRoot, data.MutationRoot)
+	return m.GenerateOpenAPIDoc(dir, data.Schema, data.QueryRoot, data.MutationRoot)
 }
 
 // 对象（包含入参、枚举、返回值）
@@ -125,6 +129,7 @@ func (api *API) Tags() []string {
 type APIObject struct {
 	OperartionID string                  `yaml:"operationId"`
 	Tags         []string                `yaml:"tags"`
+	HCIVersions  []string                `yaml:"x-hci-versions,omitempty"`
 	RequestBody  *APIRequestBody         `yaml:"requestBody,omitempty"`
 	Parameters   []*APIParameter         `yaml:"parameters,omitempty"`
 	Description  string                  `yaml:"description,omitempty"`
@@ -209,22 +214,22 @@ func formatVariableType(typ string) (formatType, formatter string) {
 }
 
 // isBaseType 判断转换之后的类型是否为基础类型
-func isBaseType(typ string) bool {
+func (m *DocPlugin) isBaseType(typ string) bool {
 	return typ == "string" || typ == "integer" || typ == "boolean" || typ == "number"
 }
 
 // isArray 判断是否为数组类型
-func isArray(typ string) bool {
+func (m *DocPlugin) isArray(typ string) bool {
 	return string(typ[0]) == "["
 }
 
 // isReuired判断是否必选类型
-func isRequired(typ string) bool {
+func (m *DocPlugin) isRequired(typ string) bool {
 	return string(typ[len(typ)-1]) == "!"
 }
 
 // 生成错误返回值对象
-func generateErrorResponse() *Object {
+func (m *DocPlugin) generateErrorResponse() *Object {
 	return &Object{
 		name:        errorResponseObject,
 		Type:        "object",
@@ -244,7 +249,7 @@ func generateErrorResponse() *Object {
 }
 
 // generateUploadObject生成上传对象
-func generateUploadObject() *Object {
+func (m *DocPlugin) generateUploadObject() *Object {
 	return &Object{
 		name:        uploadObject,
 		Type:        "object",
@@ -271,12 +276,55 @@ func generateUploadObject() *Object {
 	}
 }
 
+// generateIPObject生成IP对象(ipv4 ipv6)
+// 2001:0db8:3c4d:0015:0000:0000:1a2f:1a2b
+func (m *DocPlugin) generateIPObject() *Object {
+	minLength := int64(0)
+	maxLength := int64(39)
+	return &Object{
+		name:        ipObject,
+		Type:        "string",
+		Description: "ip object",
+		MinLength:   &minLength,
+		MaxLength:   &maxLength,
+	}
+}
+
+// generatedIPRangeObject 生成IPRange对象
+func (m *DocPlugin) generateIPRangeObject() *Object {
+	minLength := int64(0)
+	maxLength := int64(79)
+	return &Object{
+		name:        iprangeObject,
+		Type:        "string",
+		Description: "ip range object",
+		MinLength:   &minLength,
+		MaxLength:   &maxLength,
+	}
+}
+
+// generateMacAddressObject 生成mac地址对象
+func (m *DocPlugin) generateMacAddressObject() *Object {
+	minLength := int64(0)
+	maxLength := int64(59)
+	return &Object{
+		name:        macAddressObject,
+		Type:        "string",
+		Description: "mac address object",
+		MinLength:   &minLength,
+		MaxLength:   &maxLength,
+	}
+}
+
 // GenerateOpenAPIDoc 生成openapi文档
-func GenerateOpenAPIDoc(yamlDir string, schema *ast.Schema, query *codegen.Object, mutation *codegen.Object) error {
+func (m *DocPlugin) GenerateOpenAPIDoc(yamlDir string, schema *ast.Schema, query *codegen.Object, mutation *codegen.Object) error {
 	apis := make(map[string]*API)
 	objects := make(map[string]*Object)
-	objects[errorResponseObject] = generateErrorResponse()
-	objects[uploadObject] = generateUploadObject()
+	objects[errorResponseObject] = m.generateErrorResponse()
+	objects[uploadObject] = m.generateUploadObject()
+	objects[ipObject] = m.generateIPObject()
+	objects[iprangeObject] = m.generateIPRangeObject()
+	objects[macAddressObject] = m.generateMacAddressObject()
 
 	for _, typ := range schema.Types {
 		if strings.HasPrefix(typ.Name, "__") {
@@ -285,17 +333,17 @@ func GenerateOpenAPIDoc(yamlDir string, schema *ast.Schema, query *codegen.Objec
 
 		if typ.Kind == ast.Object {
 			if !(typ.Name == "Mutation" || typ.Name == "Query") {
-				objects[typ.Name] = parseObject(typ)
+				objects[typ.Name] = m.parseObject(typ)
 			}
 		} else if typ.Kind == ast.Enum {
-			objects[typ.Name] = parseEnum(typ)
+			objects[typ.Name] = m.parseEnum(typ)
 		} else if typ.Kind == ast.InputObject {
-			objects[typ.Name] = parseObject(typ)
+			objects[typ.Name] = m.parseObject(typ)
 		}
 	}
 
-	apis = parseAPI(query, apis, objects, "GET")
-	apis = parseAPI(mutation, apis, objects, "POST")
+	apis = m.parseAPI(query, apis, objects, "GET")
+	apis = m.parseAPI(mutation, apis, objects, "POST")
 
 	apiTagMap := make(map[string][]*API)
 	for _, api := range apis {
@@ -311,14 +359,14 @@ func GenerateOpenAPIDoc(yamlDir string, schema *ast.Schema, query *codegen.Objec
 	// 获取全部定义之后，开始生成OpenAPI文档
 	for tag, api := range apiTagMap {
 		yamlFile := filepath.Join(yamlDir, tag+".yaml")
-		if err := saveOpenAPIDoc(yamlFile, api, objects); err != nil {
+		if err := m.saveOpenAPIDoc(yamlFile, api, objects); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func saveOpenAPIDoc(yamlFile string, apis []*API, objects map[string]*Object) error {
+func (m *DocPlugin) saveOpenAPIDoc(yamlFile string, apis []*API, objects map[string]*Object) error {
 	doc := &OpenAPIDoc{
 		OpenAPI: "3.0.1",
 		Info: &OpenAPIInfo{
@@ -336,7 +384,7 @@ func saveOpenAPIDoc(yamlFile string, apis []*API, objects map[string]*Object) er
 		doc.Paths[api.uri] = api
 		// 添加关联对象
 		for _, objName := range api.relatedObjecs {
-			addRelatedObjectsToComponents(doc, objName, objects)
+			m.addRelatedObjectsToComponents(doc, objName, objects)
 		}
 	}
 
@@ -362,7 +410,7 @@ func saveOpenAPIDoc(yamlFile string, apis []*API, objects map[string]*Object) er
 }
 
 // 递归的将关联对象，加入到components中
-func addRelatedObjectsToComponents(doc *OpenAPIDoc, objName string, objects map[string]*Object) {
+func (m *DocPlugin) addRelatedObjectsToComponents(doc *OpenAPIDoc, objName string, objects map[string]*Object) {
 	obj, ok := objects[objName]
 	if !ok {
 		dbgPrintf("object :%v not exist", objName)
@@ -371,12 +419,12 @@ func addRelatedObjectsToComponents(doc *OpenAPIDoc, objName string, objects map[
 
 	doc.Components.Schemas[obj.name] = obj
 	for _, name := range obj.relatedObjects {
-		addRelatedObjectsToComponents(doc, name, objects)
+		m.addRelatedObjectsToComponents(doc, name, objects)
 	}
 }
 
 // parseAPI 解析API定义
-func parseAPI(data *codegen.Object, apis map[string]*API, components map[string]*Object, defaultMethod string) map[string]*API {
+func (m *DocPlugin) parseAPI(data *codegen.Object, apis map[string]*API, components map[string]*Object, defaultMethod string) map[string]*API {
 	if data == nil {
 		return apis
 	}
@@ -435,6 +483,13 @@ func parseAPI(data *codegen.Object, apis map[string]*API, components map[string]
 					category := arg.Value.String()
 					category = strings.ReplaceAll(category, "\"", "")
 					obj.Tags = []string{category}
+				} else if arg.Name == "versions" {
+					if !m.isPublished {
+						// 非发布API，才到处HCI版本
+						value := strings.ReplaceAll(arg.Value.String(), "[", "")
+						versions := strings.Split(strings.ReplaceAll(value, "]", ""), ",")
+						obj.HCIVersions = append(obj.HCIVersions, versions...)
+					}
 				}
 			}
 		}
@@ -443,10 +498,10 @@ func parseAPI(data *codegen.Object, apis map[string]*API, components map[string]
 		obj.Description = field.Description
 
 		responseName := strings.Title(field.Name) + "Response"
-		obj.RequestBody = parseRequestBody(field)
-		obj.Responses = generateAPIResponse(responseName)
+		obj.RequestBody = m.parseRequestBody(field)
+		obj.Responses = m.generateAPIResponse(responseName)
 
-		schema := parseType(field.Name, field.FieldDefinition.Type, nil)
+		schema := m.parseType(field.Name, field.FieldDefinition.Type, nil)
 		schema.Description = field.FieldDefinition.Description
 
 		//记录关联对象
@@ -483,14 +538,14 @@ func parseAPI(data *codegen.Object, apis map[string]*API, components map[string]
 			// requestBody为nil,才遍历args参数
 			for _, arg := range field.Args {
 				in := "query"
-				required := isRequired(arg.Type.String())
+				required := m.isRequired(arg.Type.String())
 				variable := fmt.Sprintf("{%s}", arg.Name)
 				if strings.Contains(uri, variable) {
 					in = "path"
 					required = true
 				}
 
-				schema := parseType(arg.Name, arg.Type, &arg.ArgumentDefinition.Directives)
+				schema := m.parseType(arg.Name, arg.Type, &arg.ArgumentDefinition.Directives)
 				schema.Description = arg.Description
 
 				// 记录关联对象
@@ -543,7 +598,7 @@ func parseAPI(data *codegen.Object, apis map[string]*API, components map[string]
 }
 
 // 解析出requestBody参数
-func parseRequestBody(field *codegen.Field) *APIRequestBody {
+func (m *DocPlugin) parseRequestBody(field *codegen.Field) *APIRequestBody {
 	if len(field.Args) < 1 || len(field.Args) > 1 || field.Args[0].Name != "input" {
 		// mutation只接受input参数
 		return nil
@@ -564,7 +619,7 @@ func parseRequestBody(field *codegen.Field) *APIRequestBody {
 }
 
 // generateDefaultResponse 生成默认返回值
-func generateAPIResponse(responseName string) map[string]*APIResponse {
+func (m *DocPlugin) generateAPIResponse(responseName string) map[string]*APIResponse {
 	return map[string]*APIResponse{
 		"200": {
 			Content: &APIResponseContent{
@@ -589,7 +644,7 @@ func generateAPIResponse(responseName string) map[string]*APIResponse {
 	}
 }
 
-func parseEnum(typ *ast.Definition) *Object {
+func (m *DocPlugin) parseEnum(typ *ast.Definition) *Object {
 	enum := &Object{
 		name:        typ.Name,
 		Type:        "string",
@@ -608,7 +663,7 @@ func parseEnum(typ *ast.Definition) *Object {
 	return enum
 }
 
-func parseObject(typ *ast.Definition) *Object {
+func (m *DocPlugin) parseObject(typ *ast.Definition) *Object {
 	properties := make(map[string]*SchemaType)
 	obj := &Object{
 		name:        typ.Name,
@@ -618,11 +673,11 @@ func parseObject(typ *ast.Definition) *Object {
 	}
 
 	for _, input := range typ.Fields {
-		if isRequired(input.Type.String()) {
+		if m.isRequired(input.Type.String()) {
 			obj.Required = append(obj.Required, input.Name)
 		}
 
-		schema := parseType(input.Name, input.Type, &input.Directives)
+		schema := m.parseType(input.Name, input.Type, &input.Directives)
 		schema.Description = input.Description
 
 		if len(schema.relatedObjects) > 0 {
@@ -635,16 +690,16 @@ func parseObject(typ *ast.Definition) *Object {
 	return obj
 }
 
-func parseType(typName string, typObj *ast.Type, directives *ast.DirectiveList) *SchemaType {
+func (m *DocPlugin) parseType(typName string, typObj *ast.Type, directives *ast.DirectiveList) *SchemaType {
 	schema := &SchemaType{}
 	typ, format := formatVariableType(typObj.Name())
 
-	if isArray(typObj.String()) {
+	if m.isArray(typObj.String()) {
 		// 数组
 		items := &TypeBase{}
 		schema.Type = "array"
 		schema.Items = items
-		if isBaseType(typ) {
+		if m.isBaseType(typ) {
 			// 基础类型
 			items.Type = typ
 			if format != "" {
@@ -658,7 +713,7 @@ func parseType(typName string, typObj *ast.Type, directives *ast.DirectiveList) 
 		}
 	} else {
 		// 非数组
-		if isBaseType(typ) {
+		if m.isBaseType(typ) {
 			// 基础类型
 			schema.Type = typ
 			if format != "" {
@@ -676,13 +731,13 @@ func parseType(typName string, typObj *ast.Type, directives *ast.DirectiveList) 
 	var isStringSlice bool
 	if directives != nil {
 		if numberValidator := directives.ForName("constraintNumber"); numberValidator != nil {
-			validator = parseConstraintDirectiver(typName, numberValidator)
+			validator = m.parseConstraintDirectiver(typName, numberValidator)
 		} else if stringValidator := directives.ForName("constraintString"); stringValidator != nil {
-			validator = parseConstraintDirectiver(typName, stringValidator)
+			validator = m.parseConstraintDirectiver(typName, stringValidator)
 		} else if sliceValidator := directives.ForName("constraintSlice"); sliceValidator != nil {
-			validator = parseConstraintDirectiver(typName, sliceValidator)
+			validator = m.parseConstraintDirectiver(typName, sliceValidator)
 		} else if stringSliceValidator := directives.ForName("constraintStringSlice"); stringSliceValidator != nil {
-			validator = parseConstraintDirectiver(typName, stringSliceValidator)
+			validator = m.parseConstraintDirectiver(typName, stringSliceValidator)
 			isStringSlice = true
 		}
 	}
@@ -720,7 +775,7 @@ type validator struct {
 }
 
 // 解析Constraint系列指令
-func parseConstraintDirectiver(variableName string, directive *ast.Directive) *validator {
+func (m *DocPlugin) parseConstraintDirectiver(variableName string, directive *ast.Directive) *validator {
 	obj := &validator{}
 	minimum := directive.Arguments.ForName("min")
 	if minimum == nil {

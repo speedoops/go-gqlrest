@@ -15,6 +15,7 @@ var (
 	flagCode              = flag.Bool("code", true, "generate code, default true")
 	flagDoc               = flag.Bool("doc", false, "generate openapi doc")
 	flagValidatorFilePath = flag.String("f", "./validator.yaml", "validator config file path")
+	flagPublish           = flag.Bool("publish", false, "publish api to external user")
 )
 
 func main() {
@@ -48,7 +49,7 @@ func main() {
 			os.Exit(2)
 		}
 		err = api.Generate(cfg,
-			api.AddPlugin(restgen.NewDocPlugin("graph/generated/rest.yaml", "YAML")), //this is the magic line
+			api.AddPlugin(restgen.NewDocPlugin("graph/generated/rest.yaml", "YAML", *flagPublish)), //this is the magic line
 		)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
