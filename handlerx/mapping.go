@@ -210,7 +210,7 @@ func formatArgValueToGraphQL(underlayingType string, k string, v interface{}) (s
 	switch underlayingType {
 	case "Boolean", "Int", "Float":
 		return fmt.Sprintf(`%v`, v), nil
-	case "ID", "String":
+	case "ID", "String", "Time", "IP", "IPRange", "MAC":
 		return fmt.Sprintf("%q", v), nil
 	default:
 		if typeKind, ok := typeName2TypeKinds[underlayingType]; ok {

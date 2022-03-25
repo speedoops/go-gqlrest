@@ -2,6 +2,7 @@ package restgen
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -61,6 +62,7 @@ func (m *DocPlugin) GenerateCode(data *codegen.Data) error {
 type Object struct {
 	name           string
 	Type           string                 `yaml:"type"`
+	Format         string                 `yaml:"format,omitempty"`
 	Description    string                 `yaml:"description,omitempty"`
 	Enum           []string               `yaml:"enum,omitempty"`
 	Required       []string               `yaml:"required,omitempty"`
@@ -284,6 +286,7 @@ func (m *DocPlugin) generateIPObject() *Object {
 	return &Object{
 		name:        ipObject,
 		Type:        "string",
+		Format:      "ip",
 		Description: "ip object",
 		MinLength:   &minLength,
 		MaxLength:   &maxLength,
@@ -297,6 +300,7 @@ func (m *DocPlugin) generateIPRangeObject() *Object {
 	return &Object{
 		name:        iprangeObject,
 		Type:        "string",
+		Format:      "iprange",
 		Description: "ip range object",
 		MinLength:   &minLength,
 		MaxLength:   &maxLength,
@@ -310,6 +314,7 @@ func (m *DocPlugin) generateMacAddressObject() *Object {
 	return &Object{
 		name:        macAddressObject,
 		Type:        "string",
+		Format:      "mac",
 		Description: "mac address object",
 		MinLength:   &minLength,
 		MaxLength:   &maxLength,
@@ -570,14 +575,19 @@ func (m *DocPlugin) parseAPI(data *codegen.Object, apis map[string]*API, compone
 				name := string(uri[left+1 : right])
 				description := ""
 				if len(field.Args) > 0 {
-					paramName := field.Args[0].Type.NamedType
-					// fmt.Printf("url:%v, name:%v, paramName:%v, args:%+v", url, name, paramName, field.Args[0])
+					paramName := field.Args[0].Type.Name()
 					input := components[paramName]
-					variable, ok := input.Properties[name]
-					if ok {
-						description = variable.Description
+					if input == nil {
+						log.Printf("WARNING: url '%s' InputObject:%v not found in Components.Schemas \n",
+							uri, paramName)
 					} else {
-						dbgPrintf("input:%v variable:%v not found", paramName, name)
+						variable, ok := input.Properties[name]
+						if ok {
+							description = variable.Description
+						} else {
+							log.Printf("WARNING: url '%s' path parameter:%v not found in InputObject:%v \n",
+								uri, name, paramName)
+						}
 					}
 				}
 				obj.Parameters = append(obj.Parameters, &APIParameter{
