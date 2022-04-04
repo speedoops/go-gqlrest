@@ -21,26 +21,67 @@ func jsonDecode(r io.Reader, val interface{}) error {
 	return dec.Decode(val)
 }
 
+// Deprecated: writeJSON will Return http status code
 func statusFor(errs gqlerror.List) int {
-	switch errcode.GetErrorKind(errs) {
-	case errcode.KindProtocol:
-		return http.StatusUnprocessableEntity
-	default:
+	code, _, _ := parseErrCodeFromGqlErrors(errs)
+	if code == 0 {
 		return http.StatusOK
 	}
+
+	return code
+}
+
+// parseErrCodeFromGqlErrors parse errcode and errMessage from gqlerror.List
+func parseErrCodeFromGqlErrors(errs gqlerror.List) (errCode int, errCodeStr string, errMessage string) {
+	if len(errs) == 0 {
+		return
+	}
+
+	code, msgs := strconv.Itoa(http.StatusUnprocessableEntity), []string{}
+	for _, e := range errs {
+		if n, ok := e.Extensions["code"]; ok {
+			code, _ = n.(string)
+		}
+
+		if str, ok := e.Extensions["codestr"]; ok {
+			codeStr := str.(string)
+			errCodeStr = codeStr
+		}
+
+		if len(e.Path) > 0 {
+			msgs = append(msgs, e.Message+" "+e.Path.String())
+		} else {
+			msgs = append(msgs, e.Message)
+		}
+	}
+
+	if numRegexp.MatchString(code) {
+		// if code is number string
+		errCode, _ = strconv.Atoi(code)
+	} else {
+		if code == errcode.ValidationFailed || code == errcode.ParseFailed {
+			errCode = http.StatusUnprocessableEntity
+		} else {
+			errCode = http.StatusInternalServerError
+		}
+	}
+
+	errMessage = strings.Join(msgs, "; ")
+	return
 }
 
 // RESTResponse is response struct for RESTful API call
 // @see graphql.Response
 type RESTResponse struct {
 	Code    int             `json:"code"`
+	CodeStr string          `json:"codestr,omitempty"`
 	Message string          `json:"message,omitempty"`
 	Data    json.RawMessage `json:"data"`
 }
 
 var numRegexp = regexp.MustCompile(`^\d+$`)
 
-func writeJSON(w io.Writer, r *graphql.Response, isRESTful bool) {
+func writeJSON(w http.ResponseWriter, r *graphql.Response, isRESTful bool) {
 	// 1. For GraphQL API
 	if !isRESTful {
 		b, err := json.Marshal(r)
@@ -92,30 +133,11 @@ func writeJSON(w io.Writer, r *graphql.Response, isRESTful bool) {
 	}
 
 	if len(r.Errors) > 0 {
-		code, msgs := strconv.Itoa(http.StatusUnprocessableEntity), []string{}
-		for _, e := range r.Errors {
-			if n, ok := e.Extensions["code"]; ok {
-				code, _ = n.(string)
-			}
-			if len(e.Path) > 0 {
-				msgs = append(msgs, e.Message+" "+e.Path.String())
-			} else {
-				msgs = append(msgs, e.Message)
-			}
+		response.Code, response.CodeStr, response.Message = parseErrCodeFromGqlErrors(r.Errors)
+		if response.Code != 0 {
+			// 0 means http.StatusOk
+			w.WriteHeader(response.Code)
 		}
-
-		if numRegexp.MatchString(code) {
-			// if code is number string
-			response.Code, _ = strconv.Atoi(code)
-		} else {
-			if code == errcode.ValidationFailed || code == errcode.ParseFailed {
-				response.Code = http.StatusUnprocessableEntity
-			} else {
-				response.Code = http.StatusInternalServerError
-			}
-		}
-
-		response.Message = strings.Join(msgs, "; ")
 	}
 
 	b, err := json.Marshal(response)
@@ -129,14 +151,14 @@ func writeJSON(w io.Writer, r *graphql.Response, isRESTful bool) {
 	}
 }
 
-func writeJSONError(w io.Writer, code int, isRESTful bool, msg string) {
+func writeJSONError(w http.ResponseWriter, code int, isRESTful bool, msg string) {
 	err := gqlerror.Error{
 		Message:    msg,
 		Extensions: map[string]interface{}{"code": code}}
 	writeJSON(w, &graphql.Response{Errors: gqlerror.List{&err}}, isRESTful)
 }
 
-func writeJSONErrorf(w io.Writer, code int, isRESTful bool, format string, args ...interface{}) {
+func writeJSONErrorf(w http.ResponseWriter, code int, isRESTful bool, format string, args ...interface{}) {
 	err := gqlerror.Error{
 		Message:    fmt.Sprintf(format, args...),
 		Extensions: map[string]interface{}{"code": code}}
