@@ -103,7 +103,10 @@ func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams
 			inputParams[k] = v
 			queryParams[k] = v
 		}
-		queryParams["input"] = inputParams
+
+		if len(inputParams) > 0 {
+			queryParams["input"] = inputParams
+		}
 
 		queryParamsString := make([]string, 0)
 		for k, v := range queryParams {
