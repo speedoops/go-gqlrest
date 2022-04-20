@@ -154,14 +154,14 @@ func writeJSON(w http.ResponseWriter, r *graphql.Response, isRESTful bool) {
 func writeJSONError(w http.ResponseWriter, code int, isRESTful bool, msg string) {
 	err := gqlerror.Error{
 		Message:    msg,
-		Extensions: map[string]interface{}{"code": code}}
+		Extensions: map[string]interface{}{"code": strconv.Itoa(code)}}
 	writeJSON(w, &graphql.Response{Errors: gqlerror.List{&err}}, isRESTful)
 }
 
 func writeJSONErrorf(w http.ResponseWriter, code int, isRESTful bool, format string, args ...interface{}) {
 	err := gqlerror.Error{
 		Message:    fmt.Sprintf(format, args...),
-		Extensions: map[string]interface{}{"code": code}}
+		Extensions: map[string]interface{}{"code": strconv.Itoa(code)}}
 	writeJSON(w, &graphql.Response{Errors: gqlerror.List{&err}}, isRESTful)
 }
 
