@@ -218,6 +218,11 @@ func formatArgValueToGraphQL(underlayingType string, k string, v interface{}) (s
 	default:
 		if typeKind, ok := typeName2TypeKinds[underlayingType]; ok {
 			if typeKind == "ENUM" {
+				// 校验枚举值,非空字符串
+				str, ok := v.(string)
+				if !ok || str == "" {
+					return "", fmt.Errorf("expected type %v, found %v", underlayingType, v)
+				}
 				return fmt.Sprintf(`%v`, v), nil
 			}
 

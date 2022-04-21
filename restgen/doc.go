@@ -69,6 +69,7 @@ type Object struct {
 	Properties     map[string]*SchemaType `yaml:"properties,omitempty"`
 	Minimum        *float64               `yaml:"minimum,omitempty"` //Number取值限制
 	Maximum        *float64               `yaml:"maximum,omitempty"`
+	OneOf          []float64              `yaml:"x-oneof,omitempty"`   // oneof枚举
 	MinLength      *int64                 `yaml:"minLength,omitempty"` //字符串取值限制
 	MaxLength      *int64                 `yaml:"maxLength,omitempty"`
 	Pattern        *string                `yaml:"pattern,omitempty"`
@@ -166,16 +167,17 @@ type SchemaObject struct {
 }
 
 type TypeBase struct {
-	Type      string   `yaml:"type,omitempty"`
-	Format    string   `yaml:"format,omitempty"`
-	Ref       string   `yaml:"$ref,omitempty"`
-	Minimum   *float64 `yaml:"minimum,omitempty"` //Number取值限制
-	Maximum   *float64 `yaml:"maximum,omitempty"`
-	MinLength *int64   `yaml:"minLength,omitempty"` //字符串取值限制
-	MaxLength *int64   `yaml:"maxLength,omitempty"`
-	Pattern   *string  `yaml:"pattern,omitempty"`
-	MinItems  *int64   `yaml:"minItems,omitempty"` //切片元素数量限制
-	MaxItems  *int64   `yaml:"maxItems,omitempty"`
+	Type      string    `yaml:"type,omitempty"`
+	Format    string    `yaml:"format,omitempty"`
+	Ref       string    `yaml:"$ref,omitempty"`
+	OneOf     []float64 `yaml:"x-oneof,omitempty"` // oneof枚举
+	Minimum   *float64  `yaml:"minimum,omitempty"` //Number取值限制
+	Maximum   *float64  `yaml:"maximum,omitempty"`
+	MinLength *int64    `yaml:"minLength,omitempty"` //字符串取值限制
+	MaxLength *int64    `yaml:"maxLength,omitempty"`
+	Pattern   *string   `yaml:"pattern,omitempty"`
+	MinItems  *int64    `yaml:"minItems,omitempty"` //切片元素数量限制
+	MaxItems  *int64    `yaml:"maxItems,omitempty"`
 }
 
 type SchemaType struct {
@@ -184,6 +186,7 @@ type SchemaType struct {
 	Format         string    `yaml:"format,omitempty"`
 	Ref            string    `yaml:"$ref,omitempty"`
 	Items          *TypeBase `yaml:"items,omitempty"`
+	OneOf          []float64 `yaml:"x-oneof,omitempty"` // oneof枚举
 	Minimum        *float64  `yaml:"minimum,omitempty"` //Number取值限制
 	Maximum        *float64  `yaml:"maximum,omitempty"`
 	MinLength      *int64    `yaml:"minLength,omitempty"` //字符串取值限制
@@ -447,6 +450,11 @@ func (m *DocPlugin) parseAPI(data *codegen.Object, apis map[string]*API, compone
 
 		method := GetMethod(field, defaultMethod)
 		uri = strings.ReplaceAll(uri, "\"", "")
+		if m.isPublished && strings.Contains(uri, "/internal-api") {
+			// 对外发布版本，禁掉/internal-api
+			continue
+		}
+
 		api, exist := apis[uri]
 		method = strings.ReplaceAll(method, "\"", "")
 		if !exist {
@@ -490,7 +498,7 @@ func (m *DocPlugin) parseAPI(data *codegen.Object, apis map[string]*API, compone
 					obj.Tags = []string{category}
 				} else if arg.Name == "versions" {
 					if !m.isPublished {
-						// 非发布API，才到处HCI版本
+						// 非发布API，才导出HCI版本
 						value := strings.ReplaceAll(arg.Value.String(), "[", "")
 						versions := strings.Split(strings.ReplaceAll(value, "]", ""), ",")
 						obj.HCIVersions = append(obj.HCIVersions, versions...)
@@ -755,6 +763,7 @@ func (m *DocPlugin) parseType(typName string, typObj *ast.Type, directives *ast.
 	if validator != nil {
 		schema.Maximum = validator.Maximum
 		schema.Minimum = validator.Minimum
+		schema.OneOf = validator.Oneof
 
 		schema.MaxItems = validator.MaxItems
 		schema.MinItems = validator.MinItems
@@ -776,7 +785,8 @@ func (m *DocPlugin) parseType(typName string, typObj *ast.Type, directives *ast.
 type validator struct {
 	Minimum   *float64 //Number取值限制
 	Maximum   *float64
-	MinLength *int64 //字符串长度限制
+	Oneof     []float64 //数字枚举
+	MinLength *int64    //字符串长度限制
 	MaxLength *int64
 	fomat     *string
 	Pattern   *string
@@ -812,6 +822,25 @@ func (m *DocPlugin) parseConstraintDirectiver(variableName string, directive *as
 			dbgPrintf("parse variable:%v maximum value:%v to float error:%v", variableName, maximum.Value.String(), err.Error())
 		} else {
 			obj.Maximum = &num
+		}
+	}
+
+	oneOf := directive.Arguments.ForName("oneOf")
+	if oneOf != nil {
+		v := oneOf.Value.String()
+		v = v[1 : len(v)-1]
+		values := strings.Split(v, ",")
+		array := make([]float64, 0, len(values))
+		for _, a := range values {
+			num, err := strconv.ParseFloat(a, 64)
+			if err != nil {
+				dbgPrintf("parse variable:%v oneOf value:%v to float error:%v", variableName, v, err.Error())
+			} else {
+				array = append(array, num)
+			}
+		}
+		if len(array) > 0 {
+			obj.Oneof = array
 		}
 	}
 
