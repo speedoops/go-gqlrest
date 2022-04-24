@@ -24,6 +24,7 @@ func (h DELETE) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExe
 	// https://stackoverflow.com/questions/43021058/golang-read-request-body-multiple-times
 	body, _ := ioutil.ReadAll(r.Body)
 	r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+	ctx := createResponseContext(r.Context())
 
 	params := &graphql.RawParams{}
 	params.ReadTime.Start = graphql.Now()
@@ -36,7 +37,7 @@ func (h DELETE) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExe
 		queryString, err := convertHTTPRequestToGraphQLQuery(r, params, body)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			writeJSONErrorf(w, http.StatusUnprocessableEntity, isRESTful, "query body could not be parsed: "+err.Error())
+			writeJSONErrorf(ctx, w, http.StatusUnprocessableEntity, isRESTful, "query body could not be parsed: "+err.Error())
 			return
 		}
 		params.Query = queryString
@@ -47,15 +48,15 @@ func (h DELETE) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExe
 
 	dbgPrintf("HTTP %s %s: %s %s", r.Method, r.URL.Path, params.Query, params.Variables)
 
-	rc, err := exec.CreateOperationContext(r.Context(), params)
+	rc, err := exec.CreateOperationContext(ctx, params)
 	if err != nil {
 		w.WriteHeader(statusFor(err))
-		resp := exec.DispatchError(graphql.WithOperationContext(r.Context(), rc), err)
-		writeJSON(w, resp, isRESTful)
+		resp := exec.DispatchError(graphql.WithOperationContext(ctx, rc), err)
+		writeJSON(ctx, w, resp, isRESTful)
 		return
 	}
 
-	ctx := graphql.WithOperationContext(r.Context(), rc)
+	ctx = graphql.WithOperationContext(ctx, rc)
 	responses, ctx := exec.DispatchOperation(ctx, rc)
-	writeJSON(w, responses(ctx), isRESTful)
+	writeJSON(ctx, w, responses(ctx), isRESTful)
 }

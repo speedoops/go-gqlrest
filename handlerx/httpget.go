@@ -30,6 +30,7 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 	// https://stackoverflow.com/questions/43021058/golang-read-request-body-multiple-times
 	body, _ := ioutil.ReadAll(r.Body)
 	r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+	ctx := createResponseContext(r.Context())
 
 	params := &graphql.RawParams{
 		Query:         r.URL.Query().Get("query"),
@@ -40,7 +41,7 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 	if variables := r.URL.Query().Get("variables"); variables != "" {
 		if err := jsonDecode(strings.NewReader(variables), &params.Variables); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			writeJSONError(w, http.StatusUnprocessableEntity, false, "variables could not be decoded")
+			writeJSONError(ctx, w, http.StatusUnprocessableEntity, false, "variables could not be decoded")
 			return
 		}
 	}
@@ -48,7 +49,7 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 	if extensions := r.URL.Query().Get("extensions"); extensions != "" {
 		if err := jsonDecode(strings.NewReader(extensions), &params.Extensions); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			writeJSONError(w, http.StatusUnprocessableEntity, false, "extensions could not be decoded")
+			writeJSONError(ctx, w, http.StatusUnprocessableEntity, false, "extensions could not be decoded")
 			return
 		}
 	}
@@ -61,7 +62,7 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 		queryString, err := convertHTTPRequestToGraphQLQuery(r, params, body)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			writeJSONErrorf(w, http.StatusUnprocessableEntity, isRESTful, "json body could not be decoded: "+err.Error())
+			writeJSONErrorf(ctx, w, http.StatusUnprocessableEntity, isRESTful, "json body could not be decoded: "+err.Error())
 			return
 		}
 		params.Query = queryString
@@ -72,21 +73,21 @@ func (h GET) Do(w http.ResponseWriter, r *http.Request, exec graphql.GraphExecut
 
 	dbgPrintf("HTTP %s %s: %s %s", r.Method, r.URL.Path, params.Query, params.Variables)
 
-	rc, err := exec.CreateOperationContext(r.Context(), params)
+	rc, err := exec.CreateOperationContext(ctx, params)
 	if err != nil {
 		w.WriteHeader(statusFor(err))
-		resp := exec.DispatchError(graphql.WithOperationContext(r.Context(), rc), err)
-		writeJSON(w, resp, isRESTful)
+		resp := exec.DispatchError(graphql.WithOperationContext(ctx, rc), err)
+		writeJSON(ctx, w, resp, isRESTful)
 		return
 	}
 
 	op := rc.Doc.Operations.ForName(rc.OperationName)
 	if op.Operation != ast.Query {
 		w.WriteHeader(http.StatusNotAcceptable)
-		writeJSONError(w, http.StatusBadRequest, isRESTful, "GET requests only allow query operations")
+		writeJSONError(ctx, w, http.StatusBadRequest, isRESTful, "GET requests only allow query operations")
 		return
 	}
 
-	responses, ctx := exec.DispatchOperation(r.Context(), rc)
-	writeJSON(w, responses(ctx), isRESTful)
+	responses, ctx := exec.DispatchOperation(ctx, rc)
+	writeJSON(ctx, w, responses(ctx), isRESTful)
 }
