@@ -1,6 +1,7 @@
 package handlerx
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -77,14 +78,28 @@ type RESTResponse struct {
 	CodeStr string          `json:"codestr,omitempty"`
 	Message string          `json:"message,omitempty"`
 	Data    json.RawMessage `json:"data"`
+	Total   *int64          `json:"total,omitempty"`
+}
+
+type GraphqlResponse struct {
+	*graphql.Response
+	Total *int64 `json:"total,omitempty"`
 }
 
 var numRegexp = regexp.MustCompile(`^\d+$`)
 
-func writeJSON(w http.ResponseWriter, r *graphql.Response, isRESTful bool) {
+func writeJSON(ctx context.Context, w http.ResponseWriter, r *graphql.Response, isRESTful bool) {
 	// 1. For GraphQL API
 	if !isRESTful {
-		b, err := json.Marshal(r)
+		response := &GraphqlResponse{
+			Response: r,
+		}
+
+		if responseCtx := GetResponseContext(ctx); responseCtx != nil {
+			response.Total = responseCtx.Total()
+		}
+
+		b, err := json.Marshal(response)
 		if err != nil {
 			panic(err)
 		}
@@ -140,6 +155,10 @@ func writeJSON(w http.ResponseWriter, r *graphql.Response, isRESTful bool) {
 		}
 	}
 
+	if responseCtx := GetResponseContext(ctx); responseCtx != nil {
+		response.Total = responseCtx.Total()
+	}
+
 	b, err := json.Marshal(response)
 	if err != nil {
 		panic(err)
@@ -151,18 +170,18 @@ func writeJSON(w http.ResponseWriter, r *graphql.Response, isRESTful bool) {
 	}
 }
 
-func writeJSONError(w http.ResponseWriter, code int, isRESTful bool, msg string) {
+func writeJSONError(ctx context.Context, w http.ResponseWriter, code int, isRESTful bool, msg string) {
 	err := gqlerror.Error{
 		Message:    msg,
 		Extensions: map[string]interface{}{"code": strconv.Itoa(code)}}
-	writeJSON(w, &graphql.Response{Errors: gqlerror.List{&err}}, isRESTful)
+	writeJSON(ctx, w, &graphql.Response{Errors: gqlerror.List{&err}}, isRESTful)
 }
 
-func writeJSONErrorf(w http.ResponseWriter, code int, isRESTful bool, format string, args ...interface{}) {
+func writeJSONErrorf(ctx context.Context, w http.ResponseWriter, code int, isRESTful bool, format string, args ...interface{}) {
 	err := gqlerror.Error{
 		Message:    fmt.Sprintf(format, args...),
 		Extensions: map[string]interface{}{"code": strconv.Itoa(code)}}
-	writeJSON(w, &graphql.Response{Errors: gqlerror.List{&err}}, isRESTful)
+	writeJSON(ctx, w, &graphql.Response{Errors: gqlerror.List{&err}}, isRESTful)
 }
 
 type Printer interface {
