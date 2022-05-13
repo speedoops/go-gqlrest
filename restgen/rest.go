@@ -166,6 +166,23 @@ func GetMethod(field *codegen.Field, defaultMethod string) string {
 }
 
 func StaticCheck(data *codegen.Data) {
+	for _, object := range data.MutationRoot.Fields {
+		for _, field := range object.Arguments {
+			fieldName := field.Name
+			fieldType := field.Type.String()
+			if strings.ToUpper(fieldName) == "INPUT" {
+				if fieldName != "input" {
+					log.Printf("WARNING: mutation: '%s.%s' should rename to '%s.input'.\n", object.Name, fieldName, object.Name)
+				}
+
+				if !strings.HasSuffix(fieldType, "!") {
+					log.Printf("WARNING: mutation: '%s.%s:%s' should define as Required parameter with suffix '!'.\n",
+						object.Name, fieldName, fieldType)
+				}
+			}
+		}
+	}
+
 	for _, object := range data.Inputs {
 		if !strings.HasSuffix(object.Name, "Input") && !strings.HasSuffix(object.Name, "Spec") {
 			log.Printf("WARNING: input type '%s' should be named with suffix 'Input|Spec'.\n", object.Name)

@@ -48,6 +48,8 @@ func (m *DocPlugin) MutateConfig(cfg *config.Config) error {
 }
 
 func (m *DocPlugin) GenerateCode(data *codegen.Data) error {
+	StaticCheck(data)
+
 	abs, err := filepath.Abs(m.filename)
 	if err != nil {
 		return err
@@ -182,6 +184,7 @@ type TypeBase struct {
 
 type SchemaType struct {
 	Type           string    `yaml:"type,omitempty"`
+	Nullable       *bool     `yaml:"nullable,omitempty"`
 	Description    string    `yaml:"description,omitempty"`
 	Format         string    `yaml:"format,omitempty"`
 	Ref            string    `yaml:"$ref,omitempty"`
@@ -691,12 +694,15 @@ func (m *DocPlugin) parseObject(typ *ast.Definition) *Object {
 	}
 
 	for _, input := range typ.Fields {
-		if m.isRequired(input.Type.String()) {
-			obj.Required = append(obj.Required, input.Name)
-		}
-
 		schema := m.parseType(input.Name, input.Type, &input.Directives)
 		schema.Description = input.Description
+
+		if m.isRequired(input.Type.String()) {
+			obj.Required = append(obj.Required, input.Name)
+		} else {
+			nullable := true
+			schema.Nullable = &nullable
+		}
 
 		if len(schema.relatedObjects) > 0 {
 			// 记录关联对象
