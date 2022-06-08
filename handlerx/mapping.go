@@ -2,6 +2,7 @@ package handlerx
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -214,6 +215,19 @@ func formatArgValueToGraphQL(underlayingType string, k string, v interface{}) (s
 	case "Boolean", "Int", "Float":
 		return fmt.Sprintf(`%v`, v), nil
 	case "ID", "String", "Time", "IP", "IPRange", "MAC": // TODO: 新增基于string的scalar类型时，这里必须同步添加
+		// 特殊处理国际化前缀
+		if underlayingType == "String" {
+			prefix := "\u0001"
+			str, ok := v.(string)
+			if ok && len(str) >= len(prefix) && str[:len(prefix)] == prefix {
+				body := []byte(fmt.Sprintf(`{"a":"\u0001%s"}`, str[len(prefix):]))
+				value := make(map[string]json.RawMessage)
+				if err := jsonDecode(ioutil.NopCloser(bytes.NewBuffer(body)), &value); err != nil {
+					return "", err
+				}
+				return string(value["a"]), nil
+			}
+		}
 		return fmt.Sprintf("%q", v), nil
 	default:
 		if typeKind, ok := typeName2TypeKinds[underlayingType]; ok {
