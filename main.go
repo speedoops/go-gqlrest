@@ -13,7 +13,7 @@ import (
 
 var (
 	flagCode              = flag.Bool("code", true, "generate code, default true")
-	flagDoc               = flag.Bool("doc", false, "generate openapi doc")
+	flagDoc               = flag.Bool("doc", true, "generate openapi doc")
 	flagValidatorFilePath = flag.String("f", "./validator.yaml", "validator config file path")
 	flagPublish           = flag.Bool("publish", false, "publish api to external user")
 )
