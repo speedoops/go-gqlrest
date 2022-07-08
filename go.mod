@@ -11,3 +11,5 @@ require (
 	github.com/zeromicro/go-zero v1.3.0
 	gopkg.in/yaml.v2 v2.4.0
 )
+
+replace github.com/vektah/gqlparser/v2 v2.2.0 => github.com/speedoops/gqlparser/v2 v2.4.6
