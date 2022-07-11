@@ -1,6 +1,7 @@
 package restgen
 
 import (
+	_ "embed"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -15,6 +16,9 @@ import (
 	"github.com/speedoops/go-gqlrest/restgen/utils"
 	"github.com/vektah/gqlparser/v2/ast"
 )
+
+//go:embed rest.gotpl
+var restTemplate string
 
 func New(filename string, typename string) plugin.Plugin {
 	return &Plugin{filename: filename, typeName: typename}
@@ -211,6 +215,7 @@ func (m *Plugin) GenerateCode(data *codegen.Data) error {
 	return templates.Render(templates.Options{
 		PackageName: pkgName,
 		Filename:    m.filename,
+		Template:    restTemplate,
 		Data: &ResolverBuild{
 			Data:     data,
 			TypeName: m.typeName,
