@@ -856,9 +856,9 @@ func (m *DocPlugin) parseConstraintDirectiver(variableName string, directive *as
 		obj.fomat = &formatValue
 		va := validatorConfig.GetValidatorByFormat(formatValue)
 		if va != nil {
-			obj.Pattern = &va.Pattern
-			obj.MinLength = &va.MinLength
-			obj.MaxLength = &va.MaxLength
+			obj.Pattern = va.Pattern
+			obj.MinLength = va.MinLength
+			obj.MaxLength = va.MaxLength
 		} else {
 			log.Printf("WARNING: format '%s' not found in validator.yaml.\n", formatValue)
 		}
