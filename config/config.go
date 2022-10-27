@@ -1,25 +1,25 @@
 package config
 
 import (
+	"io/ioutil"
 	"log"
 	"strings"
 
-	"github.com/zeromicro/go-zero/core/conf"
+	"gopkg.in/yaml.v2"
 )
 
 type ValidatorConf struct {
-	Name        string  `json:",optional"`
-	MinLength   *int64  `json:",optional"`
-	MaxLength   *int64  `json:",optional"`
-	Pattern     *string `json:",optional"`
-	ErrTemplate string  `json:",optional"`
+	Name      string  `yaml:"Name"`
+	MinLength *int64  `yaml:"MinLength"`
+	MaxLength *int64  `yaml:"MaxLength"`
+	Pattern   *string `yaml:"Pattern"`
 }
 
 var validators []ValidatorConf
 
 func InitValidatorConfig(filename string) {
 	var res struct {
-		Validators []ValidatorConf `json:",optional"`
+		Validators []ValidatorConf `yaml:"Validators"`
 	}
 
 	if filename == "" {
@@ -27,7 +27,18 @@ func InitValidatorConfig(filename string) {
 		return
 	}
 
-	conf.MustLoad(filename, &res)
+	file, err := ioutil.ReadFile(filename)
+	if err != nil {
+		log.Println("WARNING: read validator file error:", err.Error())
+		return
+	}
+
+	err = yaml.Unmarshal(file, &res)
+	if err != nil {
+		log.Println("WARNING: unmarshal validator file error:", err.Error())
+		return
+	}
+
 	validators = res.Validators
 }
 
