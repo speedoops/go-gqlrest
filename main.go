@@ -16,10 +16,16 @@ var (
 	flagDoc               = flag.Bool("doc", true, "generate openapi doc")
 	flagValidatorFilePath = flag.String("f", "", "validator config file path")
 	flagPublish           = flag.Bool("publish", false, "publish api to external user")
+	flagYamlFilePath      = flag.String("yaml", "", "api yaml file save dir")
+	flagRestFilePath      = flag.String("rest", "", "rest.go file save path")
+	flagTitle             = flag.String("title", "深信服HCI OpenAPI接口文档", "api yaml doc title")
 )
 
 func main() {
 	flag.Parse()
+
+	validator.SetYamlFilePath(*flagYamlFilePath)
+	validator.SetDocTitle(*flagTitle)
 
 	if *flagCode {
 		// 自动生成代码
@@ -29,8 +35,13 @@ func main() {
 			os.Exit(2)
 		}
 
+		restPath := "graph/generated/rest.go"
+		if *flagRestFilePath != "" {
+			restPath = *flagRestFilePath
+		}
+
 		err = api.Generate(cfg,
-			api.AddPlugin(restgen.New("graph/generated/rest.go", "Query")), // This is the magic line
+			api.AddPlugin(restgen.New(restPath, "Query")), // This is the magic line
 		)
 
 		if err != nil {

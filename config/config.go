@@ -16,6 +16,24 @@ type ValidatorConf struct {
 }
 
 var validators []ValidatorConf
+var yamlFilePath string
+var docTitle string
+
+func SetDocTitle(t string) {
+	docTitle = t
+}
+
+func GetDocTitle() string {
+	return docTitle
+}
+
+func SetYamlFilePath(p string) {
+	yamlFilePath = p
+}
+
+func GetYamlFilePath() string {
+	return yamlFilePath
+}
 
 func InitValidatorConfig(filename string) {
 	var res struct {
