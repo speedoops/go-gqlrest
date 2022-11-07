@@ -55,7 +55,11 @@ func (m *DocPlugin) GenerateCode(data *codegen.Data) error {
 		return err
 	}
 
-	dir := filepath.Join(filepath.Dir(abs), "apispec") // TODO: 支持指定doc的输出目录
+	dir := filepath.Join(filepath.Dir(abs), "apispec")
+	if p := validatorConfig.GetYamlFilePath(); p != "" {
+		dir = p
+	}
+
 	os.MkdirAll(dir, os.ModePerm)
 	return m.GenerateOpenAPIDoc(dir, data.Schema, data.QueryRoot, data.MutationRoot)
 }
@@ -382,8 +386,8 @@ func (m *DocPlugin) saveOpenAPIDoc(yamlFile string, apis []*API, objects map[str
 		OpenAPI: "3.0.1",
 		Info: &OpenAPIInfo{
 			Version:     "1.0.0",
-			Description: "深信服HCI OpenAPI接口文档，DO NOT EDIT !", // TODO: 不应该写死
-			Title:       "深信服HCI OpenAPI接口文档",               // TODO: 不应该写死
+			Description: validatorConfig.GetDocTitle() + " DO NOT EDIT !",
+			Title:       validatorConfig.GetDocTitle(),
 		},
 		Paths: make(map[string]*API),
 		Components: &Component{
