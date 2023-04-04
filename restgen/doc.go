@@ -14,7 +14,7 @@ import (
 	"github.com/99designs/gqlgen/plugin"
 	validatorConfig "github.com/speedoops/go-gqlrest/config"
 	"github.com/vektah/gqlparser/v2/ast"
-	"gopkg.in/yaml.v3"
+	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -403,6 +403,12 @@ func (m *DocPlugin) saveOpenAPIDoc(yamlFile string, apis []*API, objects map[str
 		}
 	}
 
+	body, err := yaml.Marshal(doc)
+	if err != nil {
+		dbgPrintf("unmashal apidoc error:%s", err.Error())
+		return err
+	}
+
 	file, err := os.OpenFile(yamlFile, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.ModePerm)
 	if err != nil {
 		dbgPrintf("open file error:%s", err.Error())
@@ -410,11 +416,8 @@ func (m *DocPlugin) saveOpenAPIDoc(yamlFile string, apis []*API, objects map[str
 	}
 	defer file.Close()
 
-	encoder := yaml.NewEncoder(file)
-	encoder.SetIndent(2) // 设置缩进为2个空格
-	err = encoder.Encode(doc)
+	_, err = file.Write(body)
 	if err != nil {
-		dbgPrintf("unmashal apidoc error:%s", err.Error())
 		return err
 	}
 
