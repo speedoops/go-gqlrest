@@ -67,21 +67,21 @@ func (m *DocPlugin) GenerateCode(data *codegen.Data) error {
 // 对象（包含入参、枚举、返回值）
 type Object struct {
 	name           string
-	Type           string                 `yaml:"type"`
-	Format         string                 `yaml:"format,omitempty"`
-	Description    string                 `yaml:"description,omitempty"`
-	Enum           []string               `yaml:"enum,omitempty"`
-	Required       []string               `yaml:"required,omitempty"`
-	Properties     map[string]*SchemaType `yaml:"properties,omitempty"`
-	Minimum        *float64               `yaml:"minimum,omitempty"` //Number取值限制
-	Maximum        *float64               `yaml:"maximum,omitempty"`
-	OneOf          []float64              `yaml:"x-oneof,omitempty"`   // oneof枚举
-	MinLength      *int64                 `yaml:"minLength,omitempty"` //字符串取值限制
-	MaxLength      *int64                 `yaml:"maxLength,omitempty"`
-	Pattern        *string                `yaml:"pattern,omitempty"`
-	MinItems       *int64                 `yaml:"minItems,omitempty"` //切片元素数量限制
-	MaxItems       *int64                 `yaml:"maxItems,omitempty"`
-	relatedObjects []string               //依赖的对象列表
+	Type           string         `yaml:"type"`
+	Format         string         `yaml:"format,omitempty"`
+	Description    string         `yaml:"description,omitempty"`
+	Enum           []string       `yaml:"enum,omitempty"`
+	Required       []string       `yaml:"required,omitempty"`
+	Properties     []yaml.MapItem `yaml:"properties,omitempty"`
+	Minimum        *float64       `yaml:"minimum,omitempty"` //Number取值限制
+	Maximum        *float64       `yaml:"maximum,omitempty"`
+	OneOf          []float64      `yaml:"x-oneof,omitempty"`   // oneof枚举
+	MinLength      *int64         `yaml:"minLength,omitempty"` //字符串取值限制
+	MaxLength      *int64         `yaml:"maxLength,omitempty"`
+	Pattern        *string        `yaml:"pattern,omitempty"`
+	MinItems       *int64         `yaml:"minItems,omitempty"` //切片元素数量限制
+	MaxItems       *int64         `yaml:"maxItems,omitempty"`
+	relatedObjects []string       //依赖的对象列表
 }
 
 // openapi文档对象
@@ -246,16 +246,16 @@ func (m *DocPlugin) generateErrorResponse() *Object {
 		name:        errorResponseObject,
 		Type:        "object",
 		Description: "http error response",
-		Properties: map[string]*SchemaType{
-			"code": {
+		Properties: []yaml.MapItem{
+			{Key: "code", Value: &SchemaType{
 				Type:        "integer",
 				Format:      "int64",
 				Description: "http status code",
-			},
-			"message": {
+			}},
+			{Key: "message", Value: &SchemaType{
 				Type:        "string",
 				Description: "error message",
-			},
+			}},
 		},
 	}
 }
@@ -266,24 +266,24 @@ func (m *DocPlugin) generateUploadObject() *Object {
 		name:        uploadObject,
 		Type:        "object",
 		Description: "upload object",
-		Properties: map[string]*SchemaType{
-			"file": {
+		Properties: []yaml.MapItem{
+			{Key: "file", Value: &SchemaType{
 				Type:        "string",
 				Description: "文件内容",
-			},
-			"filename": {
+			}},
+			{Key: "filename", Value: &SchemaType{
 				Type:        "string",
 				Description: "文件名",
-			},
-			"size": {
+			}},
+			{Key: "size", Value: &SchemaType{
 				Type:        "integer",
 				Format:      "int64",
 				Description: "文件内容大小，单位字节",
-			},
-			"content_type": {
+			}},
+			{Key: "content_type", Value: &SchemaType{
 				Type:        "string",
 				Description: "文件类型",
-			},
+			}},
 		},
 	}
 }
@@ -537,17 +537,17 @@ func (m *DocPlugin) parseAPI(data *codegen.Object, apis map[string]*API, compone
 		responseObj := &Object{
 			name: responseName,
 			Type: "object",
-			Properties: map[string]*SchemaType{
-				"code": {
+			Properties: []yaml.MapItem{
+				{Key: "code", Value: &SchemaType{
 					Type:        "integer",
 					Description: "http 状态码",
 					Format:      "int64",
-				},
-				"message": {
+				}},
+				{Key: "message", Value: &SchemaType{
 					Type:        "string",
 					Description: "http 错误信息",
-				},
-				"data": schema,
+				}},
+				{Key: "data", Value: schema},
 			},
 		}
 
@@ -596,7 +596,7 @@ func (m *DocPlugin) parseAPI(data *codegen.Object, apis map[string]*API, compone
 						log.Printf("WARNING: url '%s' InputObject:%v not found in Components.Schemas \n",
 							uri, paramName)
 					} else {
-						variable, ok := input.Properties[name]
+						variable, ok := getPropertiesValue(input.Properties, name)
 						if ok {
 							description = variable.Description
 						} else {
@@ -620,6 +620,17 @@ func (m *DocPlugin) parseAPI(data *codegen.Object, apis map[string]*API, compone
 	}
 
 	return apis
+}
+
+func getPropertiesValue(list []yaml.MapItem, key interface{}) (*SchemaType, bool) {
+	for _, item := range list {
+		if item.Key == key {
+			if value, ok := item.Value.(*SchemaType); ok {
+				return value, true
+			}
+		}
+	}
+	return nil, false
 }
 
 // 解析出requestBody参数
@@ -675,26 +686,30 @@ func (m *DocPlugin) parseEnum(typ *ast.Definition) *Object {
 		Type:        "string",
 		Description: typ.Description,
 	}
+
+	if enum.Description != "" {
+		enum.Description += "\n\n"
+	}
+	enumValuesDescription := ""
 	for _, item := range typ.EnumValues {
 		enum.Enum = append(enum.Enum, item.Name)
 		if item.Description != "" {
-			if enum.Description != "" {
-				enum.Description += ", "
+			if enumValuesDescription != "" {
+				enumValuesDescription += "\n"
 			}
-			enum.Description += fmt.Sprintf("%s(%s)", item.Name, item.Description)
+			enumValuesDescription += fmt.Sprintf("%s - %s", item.Name, strings.ReplaceAll(item.Description, "\n", " "))
 		}
 	}
-
+	enum.Description += enumValuesDescription
 	return enum
 }
 
 func (m *DocPlugin) parseObject(typ *ast.Definition) *Object {
-	properties := make(map[string]*SchemaType)
 	obj := &Object{
 		name:        typ.Name,
 		Type:        "object",
 		Description: typ.Description,
-		Properties:  properties,
+		Properties:  []yaml.MapItem{},
 	}
 
 	for _, input := range typ.Fields {
@@ -712,7 +727,7 @@ func (m *DocPlugin) parseObject(typ *ast.Definition) *Object {
 			// 记录关联对象
 			obj.relatedObjects = append(obj.relatedObjects, schema.relatedObjects...)
 		}
-		properties[input.Name] = schema
+		obj.Properties = append(obj.Properties, yaml.MapItem{Key: input.Name, Value: schema})
 	}
 
 	return obj
