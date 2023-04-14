@@ -522,7 +522,7 @@ func (m *DocPlugin) parseAPI(data *codegen.Object, apis map[string]*API, compone
 		obj.Responses = m.generateAPIResponse(responseName)
 
 		schema := m.parseType(field.Name, field.FieldDefinition.Type, nil)
-		schema.Description = field.FieldDefinition.Description
+		schema.Description = "响应数据"
 
 		//记录关联对象
 		api.relatedObjecs = append(api.relatedObjecs, responseName, errorResponseObject)
@@ -540,12 +540,12 @@ func (m *DocPlugin) parseAPI(data *codegen.Object, apis map[string]*API, compone
 			Properties: []yaml.MapItem{
 				{Key: "code", Value: &SchemaType{
 					Type:        "integer",
-					Description: "http 状态码",
+					Description: "错误码",
 					Format:      "int64",
 				}},
 				{Key: "message", Value: &SchemaType{
 					Type:        "string",
-					Description: "http 错误信息",
+					Description: "错误消息",
 				}},
 				{Key: "data", Value: schema},
 			},
