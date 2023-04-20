@@ -136,13 +136,14 @@ func (api *API) Tags() []string {
 
 // api
 type APIObject struct {
-	OperartionID string                  `yaml:"operationId"`
-	Tags         []string                `yaml:"tags"`
-	HCIVersions  []string                `yaml:"x-hci-versions,omitempty"`
-	RequestBody  *APIRequestBody         `yaml:"requestBody,omitempty"`
-	Parameters   []*APIParameter         `yaml:"parameters,omitempty"`
-	Description  string                  `yaml:"description,omitempty"`
-	Responses    map[string]*APIResponse `yaml:"responses"`
+	OperationID string                  `yaml:"operationId"`
+	Tags        []string                `yaml:"tags"`
+	Deprecated  *bool                   `yaml:"deprecated,omitempty"`
+	HCIVersions []string                `yaml:"x-hci-versions,omitempty"`
+	RequestBody *APIRequestBody         `yaml:"requestBody,omitempty"`
+	Parameters  []*APIParameter         `yaml:"parameters,omitempty"`
+	Description string                  `yaml:"description,omitempty"`
+	Responses   map[string]*APIResponse `yaml:"responses"`
 }
 
 type APIParameter struct {
@@ -510,11 +511,18 @@ func (m *DocPlugin) parseAPI(data *codegen.Object, apis map[string]*API, compone
 						versions := strings.Split(strings.ReplaceAll(value, "]", ""), ",")
 						obj.HCIVersions = append(obj.HCIVersions, versions...)
 					}
+				} else if arg.Name == "deprecated" {
+					deprecated, err := strconv.ParseBool(arg.Value.String())
+					if err != nil {
+						dbgPrintf("parse operationId:%v deprecated value:%v to bool error:%v", field.Name, arg.Value.String(), err.Error())
+					} else if deprecated {
+						obj.Deprecated = &deprecated
+					}
 				}
 			}
 		}
 
-		obj.OperartionID = field.Name
+		obj.OperationID = field.Name
 		obj.Description = field.Description
 
 		responseName := strings.Title(field.Name) + "Response"
