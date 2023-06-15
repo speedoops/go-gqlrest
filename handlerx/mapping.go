@@ -42,7 +42,6 @@ func SetupHTTP2GraphQLMapping(operations StringMap, selections StringMap,
 func convertHTTPRequestToGraphQLQuery(r *http.Request, params *graphql.RawParams, body []byte) (string, error) {
 	// DbgPrintf(r, "ADE: http.POST: %#v", r.URL.Path)
 	// DbgPrintf(r, "ADE: http.POST: %#v", r.URL.Query())
-
 	var bodyParams map[string]interface{}
 	if len(body) > 0 {
 		bodyReader := ioutil.NopCloser(bytes.NewBuffer(body))

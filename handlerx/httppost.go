@@ -20,10 +20,16 @@ func (h POST) Supports(r *http.Request) bool {
 		return false
 	}
 
+	// 如果 Content-Type 头部不存在，则会被放通
 	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-	if err != nil || mediaType != "application/json" {
+	if err != nil && err.Error() != "mime: no media type" {
 		return false
 	}
+
+	if mediaType != "" && mediaType != "application/json" {
+		return false
+	}
+
 	return r.Method == "POST" || r.Method == "PUT" || r.Method == "PATCH"
 }
 

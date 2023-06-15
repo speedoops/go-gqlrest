@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -592,10 +593,10 @@ func (m *DocPlugin) parseAPI(data *codegen.Object, apis map[string]*API, compone
 			}
 		} else {
 			// 判断是否需要添加url parameter参数
-			left := strings.Index(uri, "{")
-			if left > -1 {
-				right := strings.Index(uri, "}")
-				name := string(uri[left+1 : right])
+			re := regexp.MustCompile(`{([^{}]+)}`)
+			matches := re.FindAllStringSubmatch(uri, -1)
+			for _, match := range matches {
+				name := match[1]
 				description := ""
 				if len(field.Args) > 0 {
 					paramName := field.Args[0].Type.Name()
@@ -610,6 +611,28 @@ func (m *DocPlugin) parseAPI(data *codegen.Object, apis map[string]*API, compone
 						} else {
 							log.Printf("WARNING: url '%s' path parameter:%v not found in InputObject:%v \n",
 								uri, name, paramName)
+						}
+
+						// 将input中required、properties内url parameter参数剔除，避免重复
+						required_res := make([]string, 0)
+						for _, v := range input.Required {
+							if v != name {
+								required_res = append(required_res, v)
+							}
+						}
+						input.Required = required_res
+						properties_res := make([]yaml.MapItem, 0)
+						for _, item := range input.Properties {
+							if item.Key != name {
+								properties_res = append(properties_res, item)
+							}
+						}
+						input.Properties = properties_res
+
+						// 若input中properties为空，则对应的components[paramName]、requestBody也要剔除
+						if len(input.Properties) == 0 {
+							delete(components, paramName)
+							obj.RequestBody = nil
 						}
 					}
 				}
