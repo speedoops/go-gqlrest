@@ -446,6 +446,15 @@ func (m *DocPlugin) parseAPI(data *codegen.Object, apis map[string]*API, compone
 		return apis
 	}
 
+	// 统计component被使用的次数，包含自身使用以及被引用
+	componentUsedCount := make(map[string]int)
+	for paramName, obj := range components {
+		componentUsedCount[paramName]++
+		for _, relatedObject := range obj.relatedObjects {
+			componentUsedCount[relatedObject]++
+		}
+	}
+
 	for _, field := range data.Fields {
 		if IsIgnoreField(field) {
 			continue
@@ -613,26 +622,28 @@ func (m *DocPlugin) parseAPI(data *codegen.Object, apis map[string]*API, compone
 								uri, name, paramName)
 						}
 
-						// 将input中required、properties内url parameter参数剔除，避免重复
-						required_res := make([]string, 0)
-						for _, v := range input.Required {
-							if v != name {
-								required_res = append(required_res, v)
+						if count, ok := componentUsedCount[paramName]; ok && count < 2 { // 特殊处理：如果paramName被多次使用，则忽略requestBody的处理
+							// 将input中required、properties内url parameter参数剔除，避免重复
+							requiredRes := make([]string, 0)
+							for _, v := range input.Required {
+								if v != name {
+									requiredRes = append(requiredRes, v)
+								}
 							}
-						}
-						input.Required = required_res
-						properties_res := make([]yaml.MapItem, 0)
-						for _, item := range input.Properties {
-							if item.Key != name {
-								properties_res = append(properties_res, item)
+							input.Required = requiredRes
+							propertiesRes := make([]yaml.MapItem, 0)
+							for _, item := range input.Properties {
+								if item.Key != name {
+									propertiesRes = append(propertiesRes, item)
+								}
 							}
-						}
-						input.Properties = properties_res
+							input.Properties = propertiesRes
 
-						// 若input中properties为空，则对应的components[paramName]、requestBody也要剔除
-						if len(input.Properties) == 0 {
-							delete(components, paramName)
-							obj.RequestBody = nil
+							// 若input中properties为空，则对应的components[paramName]、requestBody也要剔除
+							if len(input.Properties) == 0 {
+								delete(components, paramName)
+								obj.RequestBody = nil
+							}
 						}
 					}
 				}
