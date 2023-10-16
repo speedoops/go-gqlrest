@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path"
 
 	"github.com/99designs/gqlgen/api"
 	"github.com/99designs/gqlgen/codegen/config"
@@ -27,21 +28,22 @@ func main() {
 	validator.SetYamlFilePath(*flagYamlFilePath)
 	validator.SetDocTitle(*flagTitle)
 
+	cfg, err := config.LoadConfigFromDefaultLocations()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "failed to load config", err.Error())
+		os.Exit(2)
+	}
+	outputDir := path.Dir(cfg.Exec.Filename)
+
 	if *flagCode {
 		// 自动生成代码
-		cfg, err := config.LoadConfigFromDefaultLocations()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "failed to load config", err.Error())
-			os.Exit(2)
-		}
-
-		restPath := "graph/generated/rest.go"
+		restfile := path.Join(outputDir, "rest.go")
 		if *flagRestFilePath != "" {
-			restPath = *flagRestFilePath
+			restfile = *flagRestFilePath
 		}
 
 		err = api.Generate(cfg,
-			api.AddPlugin(restgen.New(restPath, "Query")), // This is the magic line
+			api.AddPlugin(restgen.New(restfile, "Query")), // This is the magic line
 		)
 
 		if err != nil {
@@ -54,13 +56,9 @@ func main() {
 		// 解析检查器配置，允许文件不存在
 		validator.InitValidatorConfig(*flagValidatorFilePath)
 		// 自动生成文档
-		cfg, err := config.LoadConfigFromDefaultLocations()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "failed to load config", err.Error())
-			os.Exit(2)
-		}
+		yamlfile := path.Join(outputDir, "rest.yaml")
 		err = api.Generate(cfg,
-			api.AddPlugin(restgen.NewDocPlugin("graph/generated/rest.yaml", "YAML", *flagPublish)), //this is the magic line
+			api.AddPlugin(restgen.NewDocPlugin(yamlfile, "YAML", *flagPublish)), //this is the magic line
 		)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
