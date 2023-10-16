@@ -407,13 +407,13 @@ func (m *DocPlugin) saveOpenAPIDoc(yamlFile string, apis []*API, objects map[str
 
 	body, err := yaml.Marshal(doc)
 	if err != nil {
-		dbgPrintf("unmashal apidoc error:%s", err.Error())
+		log.Printf("unmashal apidoc error:%s", err.Error())
 		return err
 	}
 
 	file, err := os.OpenFile(yamlFile, os.O_CREATE|os.O_RDWR|os.O_TRUNC, os.ModePerm)
 	if err != nil {
-		dbgPrintf("open file error:%s", err.Error())
+		log.Printf("open file error:%s", err.Error())
 		return err
 	}
 	defer file.Close()
@@ -430,7 +430,7 @@ func (m *DocPlugin) saveOpenAPIDoc(yamlFile string, apis []*API, objects map[str
 func (m *DocPlugin) addRelatedObjectsToComponents(doc *OpenAPIDoc, objName string, objects map[string]*Object) {
 	obj, ok := objects[objName]
 	if !ok {
-		dbgPrintf("object :%v not exist", objName)
+		log.Printf("object :%v not exist", objName)
 		return
 	}
 
@@ -495,7 +495,7 @@ func (m *DocPlugin) parseAPI(data *codegen.Object, apis map[string]*API, compone
 			api.Delete = obj
 		} else {
 			api.Get = obj
-			dbgPrintf("not suppor http method:%v", method)
+			log.Printf("not suppor http method:%v", method)
 		}
 
 		uris := strings.Split(uri, "/")
@@ -524,7 +524,7 @@ func (m *DocPlugin) parseAPI(data *codegen.Object, apis map[string]*API, compone
 				} else if arg.Name == "deprecated" {
 					deprecated, err := strconv.ParseBool(arg.Value.String())
 					if err != nil {
-						dbgPrintf("parse operationId:%v deprecated value:%v to bool error:%v", field.Name, arg.Value.String(), err.Error())
+						log.Printf("parse operationId:%v deprecated value:%v to bool error:%v", field.Name, arg.Value.String(), err.Error())
 					} else if deprecated {
 						obj.Deprecated = &deprecated
 					}
@@ -872,7 +872,7 @@ func (m *DocPlugin) parseConstraintDirectiver(variableName string, directive *as
 	if minimum != nil {
 		num, err := strconv.ParseFloat(minimum.Value.String(), 64)
 		if err != nil {
-			dbgPrintf("parse variable:%v minimum value:%v to float error:%v", variableName, minimum.Value.String(), err.Error())
+			log.Printf("parse variable:%v minimum value:%v to float error:%v", variableName, minimum.Value.String(), err.Error())
 		} else {
 			obj.Minimum = &num
 		}
@@ -886,7 +886,7 @@ func (m *DocPlugin) parseConstraintDirectiver(variableName string, directive *as
 	if maximum != nil {
 		num, err := strconv.ParseFloat(maximum.Value.String(), 64)
 		if err != nil {
-			dbgPrintf("parse variable:%v maximum value:%v to float error:%v", variableName, maximum.Value.String(), err.Error())
+			log.Printf("parse variable:%v maximum value:%v to float error:%v", variableName, maximum.Value.String(), err.Error())
 		} else {
 			obj.Maximum = &num
 		}
@@ -901,7 +901,7 @@ func (m *DocPlugin) parseConstraintDirectiver(variableName string, directive *as
 		for _, a := range values {
 			num, err := strconv.ParseFloat(a, 64)
 			if err != nil {
-				dbgPrintf("parse variable:%v oneOf value:%v to float error:%v", variableName, v, err.Error())
+				log.Printf("parse variable:%v oneOf value:%v to float error:%v", variableName, v, err.Error())
 			} else {
 				array = append(array, num)
 			}
@@ -929,7 +929,7 @@ func (m *DocPlugin) parseConstraintDirectiver(variableName string, directive *as
 	if minLength != nil {
 		num, err := strconv.ParseInt(minLength.Value.String(), 10, 64)
 		if err != nil {
-			dbgPrintf("parse variable:%v minLength value:%v to int error:%v", variableName, minLength.Value.String(), err.Error())
+			log.Printf("parse variable:%v minLength value:%v to int error:%v", variableName, minLength.Value.String(), err.Error())
 		} else {
 			obj.MinLength = &num
 		}
@@ -939,7 +939,7 @@ func (m *DocPlugin) parseConstraintDirectiver(variableName string, directive *as
 	if maxLength != nil {
 		num, err := strconv.ParseInt(maxLength.Value.String(), 10, 64)
 		if err != nil {
-			dbgPrintf("parse variable:%v maxLength value:%v to int error:%v", variableName, maxLength.Value.String(), err.Error())
+			log.Printf("parse variable:%v maxLength value:%v to int error:%v", variableName, maxLength.Value.String(), err.Error())
 		} else {
 			obj.MaxLength = &num
 		}
@@ -949,7 +949,7 @@ func (m *DocPlugin) parseConstraintDirectiver(variableName string, directive *as
 	if minItems != nil {
 		num, err := strconv.ParseInt(minItems.Value.String(), 10, 64)
 		if err != nil {
-			dbgPrintf("parse variable:%v minItems value:%v to int error:%v", variableName, minItems.Value.String(), err.Error())
+			log.Printf("parse variable:%v minItems value:%v to int error:%v", variableName, minItems.Value.String(), err.Error())
 		} else {
 			obj.MinItems = &num
 		}
@@ -959,7 +959,7 @@ func (m *DocPlugin) parseConstraintDirectiver(variableName string, directive *as
 	if maxItems != nil {
 		num, err := strconv.ParseInt(maxItems.Value.String(), 10, 64)
 		if err != nil {
-			dbgPrintf("parse variable:%v maxItems value:%v to int error:%v", variableName, maxItems.Value.String(), err.Error())
+			log.Printf("parse variable:%v maxItems value:%v to int error:%v", variableName, maxItems.Value.String(), err.Error())
 		} else {
 			obj.MaxItems = &num
 		}

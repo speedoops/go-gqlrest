@@ -3,7 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
+	"log"
 	"os"
+	"path"
 
 	"github.com/99designs/gqlgen/api"
 	"github.com/99designs/gqlgen/codegen/config"
@@ -19,52 +22,43 @@ var (
 	flagYamlFilePath      = flag.String("yaml", "", "api yaml file save dir")
 	flagRestFilePath      = flag.String("rest", "", "rest.go file save path")
 	flagTitle             = flag.String("title", "深信服HCI OpenAPI接口文档", "api yaml doc title")
+	verbose               = flag.Bool("verbose", false, "verbose")
 )
 
 func main() {
 	flag.Parse()
 
-	validator.SetYamlFilePath(*flagYamlFilePath)
-	validator.SetDocTitle(*flagTitle)
-
-	if *flagCode {
-		// 自动生成代码
-		cfg, err := config.LoadConfigFromDefaultLocations()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "failed to load config", err.Error())
-			os.Exit(2)
-		}
-
-		restPath := "graph/generated/rest.go"
-		if *flagRestFilePath != "" {
-			restPath = *flagRestFilePath
-		}
-
-		err = api.Generate(cfg,
-			api.AddPlugin(restgen.New(restPath, "Query")), // This is the magic line
-		)
-
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(3)
-		}
+	if !*verbose {
+		log.SetOutput(io.Discard)
 	}
 
+	cfg, err := config.LoadConfigFromDefaultLocations()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "failed to load config", err.Error())
+		os.Exit(2)
+	}
+	outputDir := path.Dir(cfg.Exec.Filename)
+
+	options := []api.Option{}
+
+	// rest.go
+	if *flagCode {
+		restfile := path.Join(outputDir, "rest.go")
+		options = append(options, api.AddPlugin(restgen.New(restfile, "Query")))
+	}
+
+	// rest.yaml
 	if *flagDoc {
-		// 解析检查器配置，允许文件不存在
+		validator.SetYamlFilePath(*flagYamlFilePath)
+		validator.SetDocTitle(*flagTitle)
 		validator.InitValidatorConfig(*flagValidatorFilePath)
-		// 自动生成文档
-		cfg, err := config.LoadConfigFromDefaultLocations()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "failed to load config", err.Error())
-			os.Exit(2)
-		}
-		err = api.Generate(cfg,
-			api.AddPlugin(restgen.NewDocPlugin("graph/generated/rest.yaml", "YAML", *flagPublish)), //this is the magic line
-		)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(3)
-		}
+		yamlfile := path.Join(outputDir, "rest.yaml")
+		options = append(options, api.AddPlugin(restgen.NewDocPlugin(yamlfile, "YAML", *flagPublish)))
+	}
+
+	err = Generate(cfg, options...)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(3)
 	}
 }
