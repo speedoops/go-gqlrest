@@ -12,14 +12,14 @@ type IP string
 
 // UnmarshalGQL implements the graphql.Unmarshaler interface
 func (ip *IP) UnmarshalGQL(v interface{}) error {
-	val, ok := v.(string)
+	s, ok := v.(string)
 	if !ok {
-		return fmt.Errorf("IP must be a string")
+		return &net.AddrError{Err: "invalid IP address", Addr: s}
 	}
-	if net.ParseIP(val) == nil {
-		return fmt.Errorf("invalid IP format")
+	if s != "" && net.ParseIP(s) == nil {
+		return &net.AddrError{Err: "invalid IP address", Addr: s}
 	}
-	*ip = IP(val)
+	*ip = IP(s)
 	return nil
 }
 
@@ -33,20 +33,20 @@ type IPRange string
 
 // UnmarshalGQL implements the graphql.Unmarshaler interface
 func (iprange *IPRange) UnmarshalGQL(v interface{}) error {
-	val, ok := v.(string)
+	s, ok := v.(string)
 	if !ok {
 		return fmt.Errorf("IPRange must be a string")
 	}
-	ips := strings.Split(val, "-")
-	if len(ips) > 2 {
-		return fmt.Errorf("invalid IPRange format")
+	ss := strings.Split(s, "-")
+	if len(ss) > 2 {
+		return &net.AddrError{Err: "invalid IPRange address", Addr: s}
 	}
-	for _, ip := range ips {
+	for _, ip := range ss {
 		if net.ParseIP(ip) == nil {
 			return fmt.Errorf("invalid IPRange format")
 		}
 	}
-	*iprange = IPRange(val)
+	*iprange = IPRange(s)
 	return nil
 }
 

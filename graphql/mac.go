@@ -15,9 +15,13 @@ func (mac *MAC) UnmarshalGQL(v interface{}) error {
 	if !ok {
 		return fmt.Errorf("MAC must be a string")
 	}
-	if _, err := net.ParseMAC(val); err != nil {
-		return fmt.Errorf("invalid IP format")
+
+	if val != "" {
+		if _, err := net.ParseMAC(val); err != nil {
+			return err
+		}
 	}
+
 	*mac = MAC(val)
 	return nil
 }
