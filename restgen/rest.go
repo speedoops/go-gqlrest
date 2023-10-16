@@ -41,20 +41,6 @@ func (m *Plugin) MutateConfig(cfg *config.Config) error {
 	return nil
 }
 
-var debug bool
-
-func dbgPrintln(a ...interface{}) {
-	if debug {
-		log.Println(a...)
-	}
-}
-
-func dbgPrintf(format string, a ...interface{}) {
-	if debug {
-		log.Printf(format, a...)
-	}
-}
-
 func IsIgnoreField(field *codegen.Field) bool {
 	// 忽略内置字段
 	if strings.HasPrefix(field.Name, "__") {
@@ -64,7 +50,7 @@ func IsIgnoreField(field *codegen.Field) bool {
 	// 忽略未选字段
 	directive := field.FieldDefinition.Directives.ForName("hide")
 	if directive != nil {
-		dbgPrintln("field.directive:", directive.Name, ShouldHide(directive))
+		log.Println("field.directive:", directive.Name, ShouldHide(directive))
 	}
 
 	if ShouldHide(directive) {
@@ -76,9 +62,9 @@ func IsIgnoreField(field *codegen.Field) bool {
 
 func GetSelection(objects *codegen.Objects, field *codegen.Field, refer bool) string {
 	if !refer {
-		dbgPrintln("\n+++++++++++++++++++++++++++++++++++++++++")
+		log.Println("\n+++++++++++++++++++++++++++++++++++++++++")
 	}
-	dbgPrintln("=> field:", field.Object.Name, field.Name, field.FieldDefinition.Directives)
+	log.Println("=> field:", field.Object.Name, field.Name, field.FieldDefinition.Directives)
 
 	// 忽略内置字段
 	if IsIgnoreField(field) {
@@ -92,10 +78,10 @@ func GetSelection(objects *codegen.Objects, field *codegen.Field, refer bool) st
 
 	innerSelections := make([]string, 0)
 	for _, innerField := range field.TypeReference.Definition.Fields {
-		dbgPrintln("..innerField:", innerField.Name, innerField.Type)
+		log.Println("..innerField:", innerField.Name, innerField.Type)
 		innerDirective := innerField.Directives.ForName("hide")
 		if innerDirective != nil {
-			dbgPrintln("..innerField.directive:", innerDirective.Name, ShouldHide(innerDirective))
+			log.Println("..innerField.directive:", innerDirective.Name, ShouldHide(innerDirective))
 		}
 		if ShouldHide(innerDirective) {
 			continue
@@ -133,7 +119,7 @@ func ShouldHide(directive *ast.Directive) bool {
 
 	forName := directive.Arguments.ForName("for")
 	for _, v := range forName.Value.Children {
-		// DbgPrintln("~tags:", v.Name, v.Value)
+		// log.Println("~tags:", v.Name, v.Value)
 		if v.Value.Raw == "rest" {
 			return true
 		}
