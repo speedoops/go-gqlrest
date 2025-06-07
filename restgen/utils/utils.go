@@ -3,7 +3,7 @@ package utils
 import (
 	"go/parser"
 	"go/token"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -16,7 +16,7 @@ func NameForDir(dir string) string {
 	if err != nil {
 		return SanitizePackageName(filepath.Base(dir))
 	}
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		return SanitizePackageName(filepath.Base(dir))
 	}

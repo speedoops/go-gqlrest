@@ -21,7 +21,7 @@ var (
 	flagPublish           = flag.Bool("publish", false, "publish api to external user")
 	flagYamlFilePath      = flag.String("yaml", "", "api yaml file save dir")
 	flagRestFilePath      = flag.String("rest", "", "rest.go file save path")
-	flagTitle             = flag.String("title", "深信服HCI OpenAPI接口文档", "api yaml doc title")
+	flagTitle             = flag.String("title", "REST API", "api yaml doc title")
 	verbose               = flag.Bool("verbose", false, "verbose")
 )
 

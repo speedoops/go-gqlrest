@@ -1,11 +1,11 @@
 package config
 
 import (
-	"io/ioutil"
 	"log"
+	"os"
 	"strings"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 type ValidatorConf struct {
@@ -45,7 +45,7 @@ func InitValidatorConfig(filename string) {
 		return
 	}
 
-	file, err := ioutil.ReadFile(filename)
+	file, err := os.ReadFile(filename)
 	if err != nil {
 		log.Println("WARNING: read validator file error:", err.Error())
 		return
